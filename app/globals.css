@@ -1965,6 +1965,7 @@ svg {
   background: var(--panel);
   padding-block: 12px;
   margin-bottom: 0;
+  box-shadow: 0 -24px 0 var(--panel);
 }
 .settings-sections {
   position: sticky;
