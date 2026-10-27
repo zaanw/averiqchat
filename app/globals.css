@@ -1,39 +1,41 @@
 @import "tailwindcss";
 :root {
-  --bg: #111315;
-  --panel: #17191d;
-  --panel-soft: #1b1e23;
-  --input: #1b1e23;
-  --line: #2b2e35;
-  --text: #e7e9ed;
-  --muted: #969ca7;
-  --accent: #b4c2d9;
-  --accent-strong: #c9d3e5;
-  --accent-tint: #252c38;
-  --bubble: #23262d;
-  --mine: #2b374b;
+  --bg: #10171c;
+  --panel: #172126;
+  --panel-soft: #1d292f;
+  --input: #172126;
+  --line: #2a373d;
+  --text: #e9eff1;
+  --muted: #9aaab0;
+  --accent: #9bc8d1;
+  --accent-strong: #9bc8d1;
+  --accent-tint: #23373f;
+  --bubble: #1d2b32;
+  --mine: #2b4653;
   --danger: #ff9dba;
   --success: #8dd9be;
   --shadow: 0 8px 32px #0003;
-  --on-accent: #141922;
+  --on-accent: #102830;
+  --action: #668f9d;
   color-scheme: dark;
 }
 :root[data-theme="light"] {
-  --bg: #f7f8fa;
+  --bg: #f6f7f5;
   --panel: #fff;
-  --panel-soft: #f0f2f5;
-  --input: #f0f2f5;
-  --line: #dfe3e9;
-  --text: #20252d;
-  --muted: #69717d;
-  --accent: #455e86;
-  --accent-strong: #455e86;
-  --accent-tint: #e9eef5;
+  --panel-soft: #edf1ee;
+  --input: #f0f3f1;
+  --line: #dbe2de;
+  --text: #24322e;
+  --muted: #66756f;
+  --accent: #356c70;
+  --accent-strong: #356c70;
+  --accent-tint: #e4efec;
   --bubble: #fff;
-  --mine: #e9eef5;
+  --mine: #dfede9;
   --danger: #b12f56;
   --success: #1d7559;
   --on-accent: #fff;
+  --action: #487b89;
   color-scheme: light;
 }
 * {
@@ -41,7 +43,14 @@
 }
 body {
   margin: 0;
-  font-family: Arial, Helvetica, sans-serif;
+  font-family:
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
   color: var(--text);
   background: var(--bg);
   font-size: 14px;
@@ -146,11 +155,11 @@ svg {
 .brand {
   display: flex;
   align-items: center;
-  gap: 11px;
+  gap: 10px;
   color: var(--accent);
-  font-size: 20px;
+  font-size: 18px;
   letter-spacing: -0.5px;
-  font-weight: 700;
+  font-weight: 600;
   white-space: nowrap;
 }
 .brand > span {
@@ -167,9 +176,9 @@ svg {
   gap: 10px;
   background: var(--accent-strong);
   color: var(--on-accent);
-  border: 1px solid #ffffff12;
-  border-radius: 6px;
-  min-height: 44px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  min-height: 46px;
   padding: 11px 18px;
   font-weight: 600;
   transition:
@@ -177,7 +186,7 @@ svg {
     transform 0.2s;
 }
 .primary:hover:not(:disabled) {
-  filter: brightness(1.13);
+  filter: brightness(1.06);
 }
 .text-button {
   display: inline-flex;
@@ -273,7 +282,26 @@ svg {
   grid-template-rows: auto 1fr;
 }
 .auth-header {
-  padding: 28px 32px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px 36px;
+}
+.theme-switch {
+  display: grid;
+  place-items: center;
+  min-width: 36px;
+  height: 36px;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  color: var(--muted);
+}
+.theme-switch:hover {
+  color: var(--text);
+  border-color: var(--muted);
 }
 .auth-form-section {
   display: flex;
@@ -283,25 +311,30 @@ svg {
 }
 .auth-card {
   width: 100%;
-  max-width: 320px;
+  max-width: 352px;
 }
 .auth-card h1 {
-  font-size: 24px;
-  font-weight: 500;
+  font-size: 28px;
+  font-weight: 550;
   letter-spacing: -0.5px;
-  margin: 0 0 10px;
+  margin: 0 0 12px;
 }
 .auth-card > .muted {
-  font-size: 13px;
-  margin-bottom: 30px;
+  font-size: 14px;
+  margin-bottom: 32px;
 }
 .auth-card label {
   font-size: 12px;
-  margin-top: 20px;
+  color: var(--muted);
+  margin-top: 22px;
 }
 .auth-card input {
   margin-top: 8px;
-  padding: 11px 12px;
+  padding: 13px 14px;
+  border-radius: 9px;
+  min-height: 46px;
+  font-size: 14px;
+  color: var(--text);
 }
 .auth-card .forgot {
   display: flex;
@@ -311,8 +344,8 @@ svg {
 }
 .auth-submit {
   width: 100%;
-  margin-top: 24px;
-  font-size: 13px;
+  margin-top: 26px;
+  font-size: 14px;
 }
 .auth-switch {
   display: flex;
@@ -330,9 +363,11 @@ svg {
   color: var(--text);
 }
 .privacy-note {
-  margin-top: 36px;
+  margin-top: 32px;
+  padding-top: 24px;
+  border-top: 1px solid var(--line);
   color: var(--muted);
-  font-size: 11px;
+  font-size: 12px;
   text-align: center;
 }
 .privacy-note summary {
@@ -431,6 +466,7 @@ svg {
 }
 .conversation-item.active {
   background: var(--accent-tint);
+  box-shadow: inset 2px 0 var(--accent);
 }
 .avatar {
   display: inline-flex;
@@ -551,7 +587,7 @@ svg {
   display: flex;
   flex-direction: column;
   position: relative;
-  background: var(--chat-surface, #121b24);
+  background: var(--chat-surface, #101a20);
 }
 .chat-welcome {
   margin: auto;
@@ -688,7 +724,7 @@ svg {
   max-width: 78%;
   min-width: 90px;
   background: var(--bubble);
-  border: 1px solid #ffffff05;
+  border: 0;
   padding: 9px 12px 6px;
   border-radius: 12px 12px 12px 4px;
   overflow-wrap: anywhere;
@@ -700,8 +736,8 @@ svg {
 .bubble > p {
   white-space: pre-wrap;
   margin: 0 0 4px;
-  font-size: 14px;
-  line-height: 1.45;
+  font-size: 15px;
+  line-height: 1.5;
   scroll-margin: 60px;
 }
 .bubble .deleted {
@@ -715,7 +751,7 @@ svg {
   justify-content: end;
   gap: 5px;
   font-size: 10px;
-  opacity: 0.7;
+  opacity: 0.8;
   white-space: nowrap;
 }
 .message-meta svg {
@@ -862,7 +898,7 @@ svg {
   line-height: 20px;
 }
 .send-button {
-  background: #5d8fc4;
+  background: var(--action);
   color: #fff;
   border-radius: 50%;
   display: grid;
@@ -1042,7 +1078,7 @@ svg {
 .settings-avatar .avatar {
   width: 64px;
   height: 64px;
-  border-radius: 12px;
+  border-radius: 50%;
   font-size: 20px;
 }
 .settings-avatar label {
@@ -1239,7 +1275,7 @@ svg {
     right: -35px;
   }
   .message-meta {
-    font-size: 8px;
+    font-size: 10px;
   }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -1313,13 +1349,14 @@ svg {
   display: grid;
   place-items: center;
   border-radius: 50%;
-  background: #5d8fc4;
+  background: var(--action);
   color: #fff;
   box-shadow: 0 3px 8px #0003;
   z-index: 2;
 }
 .compose-fab:hover {
-  background: #6d9fd3;
+  background: var(--action);
+  filter: brightness(1.1);
 }
 .avatar[data-tone="0"] {
   background: #344c63;
@@ -1352,10 +1389,10 @@ svg {
   border-top-right-radius: 5px;
 }
 :root[data-theme="light"] .chat-main {
-  --chat-surface: #e6eced;
+  --chat-surface: #ebf0ed;
 }
 :root[data-theme="light"] .mine .bubble {
-  background: #dce9f7;
+  background: var(--mine);
 }
 @media (max-width: 700px) {
   .sidebar-search {
@@ -1389,5 +1426,38 @@ svg {
   }
   .message-actions button {
     padding: 6px;
+  }
+}
+
+.password-field {
+  position: relative;
+}
+.password-field input {
+  padding-right: 48px;
+}
+.password-toggle {
+  position: absolute;
+  right: 6px;
+  bottom: 5px;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 6px;
+  color: var(--muted);
+}
+.password-toggle:hover {
+  color: var(--text);
+}
+.auth-card .error,
+.auth-card .success {
+  margin: 18px 0 0;
+  font-size: 13px;
+}
+@media (min-width: 1700px) {
+  .chat-app {
+    max-width: 1680px;
+    margin-inline: auto;
+    border-inline: 1px solid var(--line);
   }
 }

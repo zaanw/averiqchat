@@ -1,16 +1,27 @@
 "use client";
 import { useState } from "react";
-import { ArrowLeft, LockKeyhole, LoaderCircle } from "lucide-react";
+import {
+  ArrowLeft,
+  LockKeyhole,
+  LoaderCircle,
+  Sun,
+  Moon,
+  Eye,
+  EyeOff,
+} from "lucide-react";
 import { getSupabase } from "../lib/supabase";
 import { passwordSchema, usernameSchema } from "../lib/validation";
 import Brand from "./brand";
 import { appPath } from "../lib/paths";
 import { errorText } from "../lib/errors";
+import { useTheme } from "../lib/use-theme";
 export default function Auth() {
   const [mode, setMode] = useState<"login" | "signup" | "reset">("login");
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const { light, toggleTheme } = useTheme();
   const client = getSupabase();
   async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -62,6 +73,13 @@ export default function Auth() {
     <main className="auth-page">
       <header className="auth-header">
         <Brand />
+        <button
+          className="theme-switch"
+          aria-label={light ? "Включить тёмную тему" : "Включить светлую тему"}
+          onClick={toggleTheme}
+        >
+          {light ? <Moon size={17} /> : <Sun size={17} />}
+        </button>
       </header>
       <section className="auth-form-section">
         <form onSubmit={submit} className="auth-card">
@@ -74,7 +92,7 @@ export default function Auth() {
           </h1>
           <p className="muted">
             {mode === "login"
-              ? "Войдите в Averiq Chat."
+              ? "Email и пароль вашего аккаунта."
               : mode === "signup"
                 ? "Укажите email и выберите юзернейм."
                 : "Отправим ссылку на ваш email."}
@@ -118,16 +136,30 @@ export default function Auth() {
           {mode !== "reset" && (
             <label>
               Пароль
-              <input
-                name="password"
-                type="password"
-                autoComplete={
-                  mode === "signup" ? "new-password" : "current-password"
-                }
-                required
-                minLength={mode === "signup" ? 12 : 1}
-                maxLength={128}
-              />
+              <div className="password-field">
+                <input
+                  name="password"
+                  aria-label="Пароль"
+                  type={showPassword ? "text" : "password"}
+                  autoComplete={
+                    mode === "signup" ? "new-password" : "current-password"
+                  }
+                  required
+                  minLength={mode === "signup" ? 12 : 1}
+                  maxLength={128}
+                />
+                <button
+                  className="password-toggle"
+                  type="button"
+                  aria-label={
+                    showPassword ? "Скрыть пароль" : "Показать пароль"
+                  }
+                  aria-pressed={showPassword}
+                  onClick={() => setShowPassword((value) => !value)}
+                >
+                  {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
+                </button>
+              </div>
               {mode === "signup" && <small>Не менее 12 символов</small>}
             </label>
           )}

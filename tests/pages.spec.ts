@@ -14,7 +14,7 @@ test("Pages export loads assets and nested auth routes under the repository path
     await page
       .locator("body")
       .evaluate((element) => getComputedStyle(element).backgroundColor),
-  ).toBe("rgb(17, 19, 21)");
+  ).toBe("rgb(16, 23, 28)");
   await page
     .getByRole("button", { name: "Зарегистрироваться", exact: true })
     .click();

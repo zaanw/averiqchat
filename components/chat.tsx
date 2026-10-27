@@ -42,6 +42,7 @@ import type {
 import { messageSchema, usernameSchema, validateFile } from "../lib/validation";
 import Brand from "./brand";
 import { errorText } from "../lib/errors";
+import { useTheme } from "../lib/use-theme";
 
 function Avatar({
   name,
@@ -166,7 +167,7 @@ export default function Chat({ userId }: { userId: string }) {
   const [connected, setConnected] = useState(false);
   const [typing, setTyping] = useState(false);
   const [emojiOpen, setEmojiOpen] = useState(false);
-  const [light, setLight] = useState(false);
+  const { light, toggleTheme } = useTheme();
   const [menu, setMenu] = useState(false);
   const [attachmentPending, setAttachmentPending] = useState(false);
   const [retryPending, setRetryPending] = useState(false);
@@ -376,14 +377,6 @@ export default function Chat({ userId }: { userId: string }) {
       clearInterval(timer);
     };
   }, [refresh]);
-  useEffect(() => {
-    const stored = localStorage.getItem("averiq-theme");
-    Promise.resolve().then(() => setLight(stored === "light"));
-  }, []);
-  useEffect(() => {
-    document.documentElement.dataset.theme = light ? "light" : "dark";
-    localStorage.setItem("averiq-theme", light ? "light" : "dark");
-  }, [light]);
   useEffect(() => {
     if (!selected) return;
     const cid = selected;
@@ -1404,10 +1397,7 @@ export default function Chat({ userId }: { userId: string }) {
                   </button>
                 </form>
                 <div className="settings-divider" />
-                <button
-                  className="settings-action"
-                  onClick={() => setLight(!light)}
-                >
+                <button className="settings-action" onClick={toggleTheme}>
                   {light ? <Moon size={18} /> : <Sun size={18} />}{" "}
                   {light ? "Тёмная тема" : "Светлая тема"}
                 </button>
