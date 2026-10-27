@@ -19,6 +19,8 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e
       - run: npm run build:pages
+        env:
+          SUPABASE_UNCONFIGURED_TEST: "1"
       - run: npm run test:pages
       - uses: actions/upload-artifact@v4
         if: failure()

@@ -2,7 +2,7 @@
 
 Самостоятельный веб-мессенджер на **Next.js 16, React, TypeScript, Tailwind CSS 4, Lucide, Zod и Supabase**. Оригинальный Midnight-интерфейс, русский язык, светлая и тёмная темы, адаптация под телефон и клавиатуру. Лицензия MIT.
 
-**Текущий статус:** приложение собирается и содержит настоящие интеграции Auth / PostgreSQL / Realtime / Storage. Для онлайн-работы нужно подключить свой Supabase и применить миграцию. Без конфигурации отображается инструкция подключения; фиктивных чатов, аккаунтов и сообщений нет. Переписка через реальный облачный Supabase пока не проверена — в среде разработки не было проекта и ключей.
+**Текущий статус:** приложение собирается и содержит настоящие интеграции Auth / PostgreSQL / Realtime / Storage. Для онлайн-работы нужно подключить свой Supabase и применить миграцию. Без конфигурации отображается инструкция подключения; фиктивных чатов, аккаунтов и сообщений нет. Проект Supabase подключён к сборке Pages; миграция, приватные бакеты, RLS, Auth redirect URL и приватный Realtime настроены. Полный обмен сообщениями и доставка писем ещё требуют проверки.
 
 ## Быстрый запуск
 
@@ -131,7 +131,7 @@ GitHub Pages размещает статический интерфейс; Supab
 1. Загрузите этот код в `zaanw/averiqchat`, ветку `main`.
 2. В репозитории откройте **Settings → Pages → Build and deployment → Source → GitHub Actions**. Для приватного репозитория доступность Pages зависит от тарифа GitHub.
    Если workflow сообщает `Get Pages site failed: Not Found`, сначала проверьте этот выбор. У build-job должно быть `pages: read` (уже задано в workflow). Параметр `enablement: true` без отдельного токена администратора не создаёт сайт: стандартного `GITHUB_TOKEN` для первоначального включения недостаточно. Для ручного включения сайта дополнительный токен не нужен.
-3. В **Settings → Secrets and variables → Actions → Variables** добавьте две repository variables: `NEXT_PUBLIC_SUPABASE_URL` и `NEXT_PUBLIC_SUPABASE_ANON_KEY`. Это публичные настройки Supabase, не service role ключ. Без них сайт откроется с инструкцией подключения, но войти и переписываться будет нельзя.
+3. Для текущего сайта публичные URL и publishable key уже записаны в `config/supabase.public.json`: Pages использует их при сборке. Это публичные, предназначенные браузеру значения; административных ключей в этом файле быть не должно. Для другого проекта или переопределения в **Settings → Secrets and variables → Actions → Variables** добавьте две repository variables: `NEXT_PUBLIC_SUPABASE_URL` и `NEXT_PUBLIC_SUPABASE_ANON_KEY`. Это публичные настройки Supabase, не service role ключ. Без repository variables текущая сборка использует публичную конфигурацию из `config/supabase.public.json`.
 4. Примените SQL-миграцию и настройте Supabase по инструкции выше. Для стандартного project Pages задайте Site URL `https://zaanw.github.io/averiqchat/`, а redirect URL **точно с завершающим слешем**:
    - `https://zaanw.github.io/averiqchat/auth/confirm/`
    - `https://zaanw.github.io/averiqchat/reset-password/`
@@ -143,12 +143,15 @@ GitHub Pages размещает статический интерфейс; Supab
 Локальная проверка именно артефакта Pages:
 
 ```bash
-npm run build:pages
-# По умолчанию собирает для /averiqchat/ без настроек Supabase.
+SUPABASE_UNCONFIGURED_TEST=1 npm run build:pages
+# Изолированная сборка без backend для браузерных тестов.
+# Обычная npm run build:pages использует подключённый проект.
 PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium npm run test:pages
 ```
 
 Если системного Chromium нет, сначала установите его через `npx playwright install chromium`, затем выполните `npm run test:pages`. Два теста (desktop/mobile) проверяют статику, JS/CSS и прямой вход на вложенные auth-страницы, включая возврат в `/averiqchat/`. Для теста конфигурация Supabase должна отсутствовать. Для собственного пути задайте `NEXT_PUBLIC_BASE_PATH` при сборке; браузерный тест проверяет стандартный путь `/averiqchat/`.
+
+Pages workflow выполняет read-only live-проверку Auth, обязательного подтверждения email и запрета анонимного чтения профилей. Это не проверка доставки письма или переписки двух аккаунтов. SMTP в подключённом проекте пока не настроен: встроенный почтовый сервис Supabase ограничивает получателей и частоту, для публичной регистрации нужен собственный SMTP. Подтверждение email остаётся включённым.
 
 На GitHub Pages не применяются HTTP-заголовки из `next.config.ts` — их поддерживает только режим с Next.js-сервером. Режим Pages отключает эту серверную настройку, использует `output: export` и `trailingSlash: true`. Не полагайтесь на серверные headers приложения на Pages; контроль доступа по-прежнему обеспечивает Supabase RLS.
 
