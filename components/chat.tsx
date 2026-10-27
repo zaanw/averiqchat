@@ -3,7 +3,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ArrowLeft,
-  ArrowUp,
+  SendHorizontal,
+  Menu,
+  PenLine,
   Check,
   CheckCheck,
   FileText,
@@ -72,7 +74,15 @@ function Avatar({
     };
   }, [path, bucket]);
   return (
-    <span className="avatar">
+    <span
+      className="avatar"
+      data-tone={
+        Array.from(name).reduce(
+          (sum, letter) => sum + letter.charCodeAt(0),
+          0,
+        ) % 5
+      }
+    >
       {url ? <img src={url} alt="" /> : name.slice(0, 2).toUpperCase()}
     </span>
   );
@@ -137,6 +147,7 @@ export default function Chat({ userId }: { userId: string }) {
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [blocked, setBlocked] = useState<string[]>([]);
   const [filter, setFilter] = useState("");
+  const [chatKind, setChatKind] = useState<"all" | "direct" | "group">("all");
   const [draft, setDraft] = useState("");
   const [reply, setReply] = useState<Message | null>(null);
   const [editing, setEditing] = useState<Message | null>(null);
@@ -463,6 +474,12 @@ export default function Chat({ userId }: { userId: string }) {
       void client.removeChannel(channel);
     };
   }, [client, selected, userId, refresh]);
+  useEffect(() => {
+    const input = composerRef.current;
+    if (!input) return;
+    input.style.height = "0px";
+    input.style.height = `${Math.min(input.scrollHeight, 144)}px`;
+  }, [draft, selected]);
   const newestMessageId = messages.at(-1)?.id;
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -576,7 +593,8 @@ export default function Chat({ userId }: { userId: string }) {
       setFile(null);
       setReply(null);
       setEditing(null);
-      await channelRef.current?.track({ typing: false, at: Date.now() });
+      // Presence must never delay displaying a message already saved by the server.
+      void channelRef.current?.track({ typing: false, at: Date.now() });
       await loaderRef.current(cid);
       await refresh();
       composerRef.current?.focus();
@@ -652,33 +670,51 @@ export default function Chat({ userId }: { userId: string }) {
     <main className={`chat-app ${selected ? "has-selection" : ""}`}>
       <aside className="sidebar">
         <header className="sidebar-top">
-          <Brand />
           <button
             className="icon-button"
-            aria-label="Новый чат"
-            onClick={() => {
-              setModal("new");
-              setFound(null);
-              setSearch("");
-              setGroupPeople([]);
-              setGroupTitle("");
-            }}
+            aria-label="Открыть настройки"
+            onClick={() => setModal("settings")}
           >
-            <Plus size={21} />
+            <Menu size={23} />
           </button>
+          <Brand />
+          <span
+            className="sidebar-total"
+            aria-label={`${conversations.length} чатов`}
+          >
+            {conversations.length}
+          </span>
         </header>
-        <div className="sidebar-heading">
-          <h1>Сообщения</h1>
-          <span>{conversations.length}</span>
-        </div>
+        <h1 className="sr-only">Сообщения</h1>
         <div className="sidebar-search input-icon">
-          <Search size={17} />
+          <Search size={19} />
           <input
             aria-label="Фильтр чатов"
-            placeholder="Найти разговор…"
+            placeholder="Поиск"
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
           />
+        </div>
+        <div
+          className="chat-filters"
+          role="group"
+          aria-label="Фильтр по типу чата"
+        >
+          {(
+            [
+              { value: "all", label: "Все" },
+              { value: "direct", label: "Личные" },
+              { value: "group", label: "Группы" },
+            ] as const
+          ).map((tab) => (
+            <button
+              key={tab.value}
+              aria-pressed={chatKind === tab.value}
+              onClick={() => setChatKind(tab.value)}
+            >
+              {tab.label}
+            </button>
+          ))}
         </div>
         <nav aria-label="Чаты" className="conversation-list">
           {loading ? (
@@ -687,8 +723,10 @@ export default function Chat({ userId }: { userId: string }) {
             </p>
           ) : (
             conversations
-              .filter((c) =>
-                nameOf(c).toLowerCase().includes(filter.toLowerCase()),
+              .filter(
+                (c) =>
+                  (chatKind === "all" || c.kind === chatKind) &&
+                  nameOf(c).toLowerCase().includes(filter.toLowerCase()),
               )
               .map((c) => {
                 const last = latest.find((m) => m.conversation_id === c.id);
@@ -711,6 +749,7 @@ export default function Chat({ userId }: { userId: string }) {
                 return (
                   <button
                     key={c.id}
+                    aria-current={c.id === selected ? "page" : undefined}
                     onClick={() => select(c.id)}
                     className={`conversation-item ${c.id === selected ? "active" : ""}`}
                   >
@@ -750,16 +789,43 @@ export default function Chat({ userId }: { userId: string }) {
                 );
               })
           )}
-          {!loading && !conversations.length && (
-            <div className="empty-list">
-              <MessageCircle size={28} />
-              <p>Здесь появятся ваши разговоры</p>
-              <button className="text-button" onClick={() => setModal("new")}>
-                Найти человека
-              </button>
-            </div>
-          )}
+          {!loading &&
+            !conversations.filter(
+              (c) =>
+                (chatKind === "all" || c.kind === chatKind) &&
+                nameOf(c).toLowerCase().includes(filter.toLowerCase()),
+            ).length && (
+              <div className="empty-list">
+                <MessageCircle size={28} />
+                <p>
+                  {filter
+                    ? "Чаты не найдены"
+                    : chatKind === "group"
+                      ? "У вас пока нет групп"
+                      : chatKind === "direct"
+                        ? "Нет личных чатов"
+                        : "У вас пока нет чатов"}
+                </p>
+                <button className="text-button" onClick={() => setModal("new")}>
+                  Найти человека
+                </button>
+              </div>
+            )}
         </nav>
+        <button
+          className="compose-fab"
+          aria-label="Новый чат"
+          title="Новый чат"
+          onClick={() => {
+            setModal("new");
+            setFound(null);
+            setSearch("");
+            setGroupPeople([]);
+            setGroupTitle("");
+          }}
+        >
+          <PenLine size={23} />
+        </button>
         <footer className="sidebar-profile">
           <button
             className="profile-button"
@@ -935,6 +1001,17 @@ export default function Chat({ userId }: { userId: string }) {
               )}
               {messages.map((m, i) => {
                 const mine = m.sender_id === userId;
+                const previous = messages[i - 1];
+                const grouped =
+                  !!previous &&
+                  previous.sender_id === m.sender_id &&
+                  !previous.deleted_at &&
+                  !m.deleted_at &&
+                  !m.reply_to &&
+                  previous.created_at.slice(0, 10) ===
+                    m.created_at.slice(0, 10) &&
+                  Date.parse(m.created_at) - Date.parse(previous.created_at) <
+                    300000;
                 const sender = profiles.find((p) => p.id === m.sender_id);
                 const quoted = messages.find((x) => x.id === m.reply_to);
                 const files = attachments.filter((a) => a.message_id === m.id);
@@ -959,9 +1036,11 @@ export default function Chat({ userId }: { userId: string }) {
                         </span>
                       </div>
                     )}
-                    <article className={`message-row ${mine ? "mine" : ""}`}>
+                    <article
+                      className={`message-row ${mine ? "mine" : ""} ${grouped ? "grouped" : ""}`}
+                    >
                       <div className="bubble">
-                        {current.kind === "group" && !mine && (
+                        {current.kind === "group" && !mine && !grouped && (
                           <strong className="sender-name">
                             {sender?.display_name || "Участник"}
                           </strong>
@@ -1026,67 +1105,78 @@ export default function Chat({ userId }: { userId: string }) {
                         </div>
                       </div>
                       {!m.deleted_at && (
-                        <div className="message-actions">
-                          <button
-                            aria-label="Ответить"
-                            disabled={busy || retryPending}
-                            title="Ответить"
-                            onClick={() => {
-                              setReply(m);
-                              setEditing(null);
-                              composerRef.current?.focus();
-                            }}
-                          >
-                            <Reply size={14} />
-                          </button>
-                          {mine ? (
-                            <>
-                              <button
-                                aria-label="Редактировать"
-                                disabled={busy || retryPending}
-                                title="Редактировать"
-                                onClick={() => {
-                                  setEditing(m);
-                                  setDraft(m.body);
-                                  setReply(null);
-                                  composerRef.current?.focus();
-                                }}
-                              >
-                                <Pencil size={14} />
-                              </button>
-                              <button
-                                aria-label="Удалить"
-                                disabled={busy || retryPending}
-                                title="Удалить"
-                                onClick={() => void removeMessage(m)}
-                              >
-                                <Trash2 size={14} />
-                              </button>
-                            </>
-                          ) : (
+                        <details
+                          className="message-menu"
+                          onClick={(event) => {
+                            if ((event.target as HTMLElement).closest("button"))
+                              event.currentTarget.removeAttribute("open");
+                          }}
+                        >
+                          <summary aria-label="Действия с сообщением">
+                            <MoreHorizontal size={17} />
+                          </summary>
+                          <div className="message-actions">
                             <button
-                              aria-label="Пожаловаться"
-                              title="Пожаловаться"
+                              aria-label="Ответить"
+                              disabled={busy || retryPending}
+                              title="Ответить"
                               onClick={() => {
-                                const reason = window.prompt(
-                                  "Причина жалобы (5–1000 символов)",
-                                );
-                                if (reason)
-                                  void run(async () => {
-                                    await rpc("report_message", {
-                                      mid: m.id,
-                                      report_reason: reason,
-                                    });
-                                    setNotice(
-                                      "Жалоба сохранена для администратора проекта",
-                                    );
-                                  });
+                                setReply(m);
+                                setEditing(null);
+                                composerRef.current?.focus();
                               }}
                             >
-                              <Flag size={14} />
+                              <Reply size={14} />
                             </button>
-                          )}
-                        </div>
+                            {mine ? (
+                              <>
+                                <button
+                                  aria-label="Редактировать"
+                                  disabled={busy || retryPending}
+                                  title="Редактировать"
+                                  onClick={() => {
+                                    setEditing(m);
+                                    setDraft(m.body);
+                                    setReply(null);
+                                    composerRef.current?.focus();
+                                  }}
+                                >
+                                  <Pencil size={14} />
+                                </button>
+                                <button
+                                  aria-label="Удалить"
+                                  disabled={busy || retryPending}
+                                  title="Удалить"
+                                  onClick={() => void removeMessage(m)}
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              </>
+                            ) : (
+                              <button
+                                aria-label="Пожаловаться"
+                                title="Пожаловаться"
+                                onClick={() => {
+                                  const reason = window.prompt(
+                                    "Причина жалобы (5–1000 символов)",
+                                  );
+                                  if (reason)
+                                    void run(async () => {
+                                      await rpc("report_message", {
+                                        mid: m.id,
+                                        report_reason: reason,
+                                      });
+                                      setNotice(
+                                        "Жалоба сохранена для администратора проекта",
+                                      );
+                                    });
+                                }}
+                              >
+                                <Flag size={14} />
+                              </button>
+                            )}
+                          </div>
+                        </details>
                       )}
                     </article>
                   </div>
@@ -1238,7 +1328,7 @@ export default function Chat({ userId }: { userId: string }) {
                     {busy ? (
                       <LoaderCircle size={20} className="spin" />
                     ) : (
-                      <ArrowUp size={21} />
+                      <SendHorizontal size={21} />
                     )}
                   </button>
                 </form>

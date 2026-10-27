@@ -11,7 +11,8 @@
     "test": "vitest run",
     "test:e2e": "playwright test",
     "build:pages": "node scripts/build-pages.mjs",
-    "test:pages": "playwright test -c playwright.pages.config.ts"
+    "test:pages": "playwright test -c playwright.pages.config.ts",
+    "test:chat": "playwright test -c playwright.chat.config.ts"
   },
   "repository": {
     "type": "git",

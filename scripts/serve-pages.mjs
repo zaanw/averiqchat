@@ -36,4 +36,4 @@ createServer(async (req, res) => {
   } catch {
     res.writeHead(404).end("Not found");
   }
-}).listen(3100, "127.0.0.1");
+}).listen(Number(process.env.PORT || 3100), "127.0.0.1");
