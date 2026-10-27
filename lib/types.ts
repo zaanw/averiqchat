@@ -37,3 +37,10 @@ export type Attachment = {
   mime_type: string;
   size: number;
 };
+
+export type ConversationPreference = {
+  user_id: string;
+  conversation_id: string;
+  pinned: boolean;
+  folder: string | null;
+};

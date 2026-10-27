@@ -1973,3 +1973,130 @@ svg {
   z-index: 2;
   background: var(--panel);
 }
+.folder-filter {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 0;
+  padding: 10px 20px;
+  color: var(--muted);
+  border-bottom: 1px solid var(--line);
+}
+.folder-filter select {
+  min-width: 0;
+  width: 100%;
+  background: var(--panel);
+  color: var(--text);
+  border: 0;
+  font: inherit;
+  padding: 4px;
+}
+.chat-main > .message-search {
+  position: absolute;
+  right: 0;
+  top: 66px;
+  bottom: 0;
+  width: 100%;
+  z-index: 12;
+  display: flex;
+  flex-direction: column;
+  background: var(--panel);
+  border-left: 1px solid var(--line);
+  box-shadow: -6px 0 24px #0002;
+}
+.message-search > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px 8px;
+}
+.message-search h3 {
+  font-size: 16px;
+  margin: 0;
+  font-weight: 500;
+}
+.message-search > form {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px 16px;
+  border-bottom: 1px solid var(--line);
+}
+.message-search input {
+  border-radius: 22px;
+  padding: 12px 15px;
+  min-width: 0;
+}
+.message-search > .error {
+  margin: 12px 16px;
+  font-size: 12px;
+}
+.search-results {
+  flex: 1;
+  overflow-y: auto;
+}
+.search-hint {
+  font-size: 13px;
+  color: var(--muted);
+  padding: 24px;
+  text-align: center;
+}
+.search-result {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--line);
+}
+.search-result > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+.search-result strong {
+  font-size: 13px;
+  font-weight: 600;
+}
+.search-result time {
+  color: var(--muted);
+  font-size: 10px;
+  white-space: nowrap;
+}
+.search-result > p {
+  font-size: var(--message-font-size, 15px);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  margin: 10px 0;
+}
+.search-result .text-button {
+  font-size: 12px;
+  padding: 4px 0;
+}
+.search-more {
+  margin: 20px auto;
+  font-size: 13px;
+}
+@media (max-width: 700px) {
+  .chat-main > .message-search {
+    top: 62px;
+    width: 100%;
+    border-left: 0;
+  }
+}
+
+@media (min-width: 1100px) {
+  .chat-main:has(> .message-search) {
+    padding-right: 390px;
+  }
+  .chat-main:has(> .message-search) > .chat-header {
+    margin-right: -390px;
+  }
+  .chat-main > .message-search {
+    width: 390px;
+  }
+}
+.search-result strong {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

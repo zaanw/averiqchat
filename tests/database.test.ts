@@ -42,6 +42,15 @@ describe("PostgreSQL migration and authorization", () => {
         "utf8",
       ),
     );
+    await db.exec(
+      readFileSync(
+        new URL(
+          "../supabase/migrations/202610270002_chat_tools.sql",
+          import.meta.url,
+        ),
+        "utf8",
+      ),
+    );
     for (let i = 0; i < 3; i++)
       await db.query(
         "insert into auth.users(id,raw_user_meta_data) values($1,$2)",
@@ -323,6 +332,166 @@ describe("PostgreSQL migration and authorization", () => {
       (await db.query("select private.path_uuid($1,1) as id", ["invalid/path"]))
         .rows,
     ).toEqual([{ id: null }]);
+  });
+  it("keeps pins and folders private and prevents forged preferences", async () => {
+    await as(0);
+    await db.query(
+      "select public.set_chat_preferences($1,true,'Работа',true)",
+      [cid],
+    );
+    expect(
+      (
+        await db.query(
+          "select pinned,folder from public.conversation_preferences",
+        )
+      ).rows,
+    ).toEqual([{ pinned: true, folder: "Работа" }]);
+    await db.query("select public.set_chat_preferences($1,false)", [cid]);
+    expect(
+      (
+        await db.query(
+          "select pinned,folder from public.conversation_preferences",
+        )
+      ).rows,
+    ).toEqual([{ pinned: false, folder: "Работа" }]);
+    await as(1);
+    expect(
+      (await db.query("select * from public.conversation_preferences")).rows,
+    ).toHaveLength(0);
+    await expect(
+      db.query(
+        "update public.conversation_preferences set folder='stolen' where user_id=$1",
+        [ids[0]],
+      ),
+    ).rejects.toThrow(/permission denied/);
+    await as(2);
+    await expect(
+      db.query("select public.set_chat_preferences($1,true)", [cid]),
+    ).rejects.toThrow(/Нет доступа/);
+    await as(0);
+    await expect(
+      db.query("select public.set_chat_preferences($1,null,$2,true)", [
+        cid,
+        "x".repeat(25),
+      ]),
+    ).rejects.toThrow(/24/);
+    await db.query("select public.set_chat_preferences($1,null,'',true)", [
+      cid,
+    ]);
+    expect(
+      (await db.query("select folder from public.conversation_preferences"))
+        .rows,
+    ).toEqual([{ folder: null }]);
+  });
+  it("searches older history literally and hides it from outsiders", async () => {
+    await as(0);
+    const message = (
+      await db.query<{ id: string }>(
+        "select public.send_message($1,$2) as id",
+        [cid, "Unique search 50%_match"],
+      )
+    ).rows[0].id;
+    await as(1);
+    expect(
+      (
+        await db.query("select id from public.search_messages($1,$2)", [
+          cid,
+          "50%_MATCH",
+        ])
+      ).rows,
+    ).toEqual([{ id: message }]);
+    expect(
+      (
+        await db.query("select id from public.search_messages($1,$2)", [
+          cid,
+          "missing needle",
+        ])
+      ).rows,
+    ).toHaveLength(0);
+    await expect(
+      db.query("select * from public.search_messages($1,'a')", [cid]),
+    ).rejects.toThrow(/2 до 100/);
+    await as(2);
+    await expect(
+      db.query("select * from public.search_messages($1,'Unique')", [cid]),
+    ).rejects.toThrow(/Нет доступа/);
+    await as(0);
+    await db.query("select public.delete_message($1)", [message]);
+    expect(
+      (
+        await db.query("select id from public.search_messages($1,$2)", [
+          cid,
+          "50%_match",
+        ])
+      ).rows,
+    ).toHaveLength(0);
+  });
+  it("paginates search without losing messages with equal timestamps", async () => {
+    await as(0);
+    const searchChat = (
+      await db.query<{ id: string }>(
+        "select public.create_group('Search cursor',$1::uuid[]) as id",
+        [[]],
+      )
+    ).rows[0].id;
+    await db.exec("reset role");
+    for (let i = 0; i < 55; i++)
+      await db.query(
+        "insert into public.messages(conversation_id,sender_id,body,created_at) values($1,$2,'Cursor needle', '2026-10-27T01:00:00Z')",
+        [searchChat, ids[0]],
+      );
+    await as(0);
+    const first = (
+      await db.query<{ id: string; created_at: string }>(
+        "select id,created_at from public.search_messages($1,'needle')",
+        [searchChat],
+      )
+    ).rows;
+    expect(first).toHaveLength(50);
+    const last = first.at(-1)!;
+    const second = (
+      await db.query<{ id: string }>(
+        "select id from public.search_messages($1,'needle',$2,$3)",
+        [searchChat, last.created_at, last.id],
+      )
+    ).rows;
+    expect(second).toHaveLength(5);
+    expect(
+      new Set([...first, ...second].map((message) => message.id)).size,
+    ).toBe(55);
+    expect(
+      (
+        await db.query("select id from public.search_messages($1,'needle')", [
+          cid,
+        ])
+      ).rows,
+    ).toHaveLength(0);
+  });
+  it("removes personal preferences when membership ends", async () => {
+    await as(0);
+    const groupId = (
+      await db.query<{ id: string }>(
+        "select public.create_group('Temporary folder group',$1::uuid[]) as id",
+        [[ids[1]]],
+      )
+    ).rows[0].id;
+    await as(1);
+    await db.query(
+      "select public.set_chat_preferences($1,true,'Личное',true)",
+      [groupId],
+    );
+    await db.query("select public.leave_group($1)", [groupId]);
+    expect(
+      (
+        await db.query(
+          "select * from public.conversation_preferences where conversation_id=$1",
+          [groupId],
+        )
+      ).rows,
+    ).toHaveLength(0);
+    await expect(
+      db.query("select public.search_messages($1,'test')", [groupId]),
+    ).rejects.toThrow(/Нет доступа/);
   });
   it("throttles persisted sends server-side", async () => {
     await as(0);

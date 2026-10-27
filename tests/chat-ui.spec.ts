@@ -40,6 +40,18 @@ test("chat filters, mobile navigation, grouped messages, composer and theme", as
       deleted_at: null,
     },
   ];
+  const organization: {
+    user_id: string;
+    conversation_id: string;
+    pinned: boolean;
+    folder: string | null;
+  }[] = [];
+  const searchOnly = {
+    ...messages[0],
+    id: crypto.randomUUID(),
+    body: "Документ за прошлый год",
+    created_at: "2025-01-01T10:00:00Z",
+  };
   const conversations = [
     {
       id: direct,
@@ -118,7 +130,38 @@ test("chat filters, mobile navigation, grouped messages, composer and theme", as
         )
         .slice()
         .reverse();
-    else if (path.endsWith("/attachments") || path.endsWith("/blocks"))
+    else if (path.endsWith("/conversation_preferences")) data = organization;
+    else if (path.endsWith("/rpc/set_chat_preferences")) {
+      const payload = route.request().postDataJSON();
+      let preference = organization.find(
+        (item) => item.conversation_id === payload.cid,
+      );
+      if (!preference) {
+        preference = {
+          user_id: me,
+          conversation_id: payload.cid,
+          pinned: false,
+          folder: null,
+        };
+        organization.push(preference);
+      }
+      if (payload.pinned_value !== undefined)
+        preference.pinned = payload.pinned_value;
+      if (payload.set_folder) preference.folder = payload.folder_value || null;
+      data = null;
+    } else if (path.endsWith("/rpc/search_messages")) {
+      const payload = route.request().postDataJSON();
+      data = [...messages, searchOnly]
+        .filter(
+          (message) =>
+            message.conversation_id === payload.cid &&
+            !message.deleted_at &&
+            message.body
+              .toLowerCase()
+              .includes(payload.query_text.trim().toLowerCase()),
+        )
+        .reverse();
+    } else if (path.endsWith("/attachments") || path.endsWith("/blocks"))
       data = [];
     else if (path.endsWith("/rpc/mark_read")) data = null;
     else if (path.endsWith("/rpc/send_message")) {
@@ -159,12 +202,96 @@ test("chat filters, mobile navigation, grouped messages, composer and theme", as
   await expect(page.locator(".conversation-item")).toHaveCount(1);
   await expect(page.locator(".conversation-item")).toContainText("Команда");
   await page.getByRole("button", { name: "Все", exact: true }).click();
+  await page
+    .locator(".conversation-item")
+    .filter({ hasText: "Команда" })
+    .click();
+  await page
+    .getByRole("button", { name: "Действия с чатом", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Закрепить чат", exact: true })
+    .click();
+  await expect(page.locator(".conversation-item").first()).toContainText(
+    "Команда",
+  );
+  await expect(page.getByLabel("Закреплённый чат")).toHaveCount(1);
+  await page
+    .getByRole("button", { name: "Действия с чатом", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Открепить чат", exact: true })
+    .click();
+  await expect(page.locator(".conversation-item").first()).toContainText(
+    "Алина",
+  );
+  await page
+    .getByRole("button", { name: "Действия с чатом", exact: true })
+    .click();
+  await page.getByRole("button", { name: "В папку", exact: true }).click();
+  await page.getByLabel("Название папки").fill("Работа");
+  await page
+    .getByRole("button", { name: "Сохранить папку", exact: true })
+    .click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Действия с чатом", exact: true }),
+  ).toBeFocused();
+  if (info.project.name === "mobile")
+    await page.getByRole("button", { name: "Назад к чатам" }).click();
+  await page.getByLabel("Папка чатов").selectOption("Работа");
+  await expect(page.locator(".conversation-item")).toHaveCount(1);
+  await expect(page.locator(".conversation-item")).toContainText("Команда");
+  await page.getByLabel("Папка чатов").selectOption("");
   await page.getByRole("textbox", { name: "Фильтр чатов" }).fill("Алина");
   await expect(page.locator(".conversation-item")).toHaveCount(1);
   await page.locator(".conversation-item").click();
   await expect(
     page.getByRole("heading", { name: "Алина", exact: true }),
   ).toBeVisible();
+  await expect(page.getByRole("log")).not.toContainText(
+    "Документ за прошлый год",
+  );
+  await page
+    .getByRole("button", { name: "Поиск сообщений", exact: true })
+    .click();
+  await page
+    .getByRole("textbox", { name: "Текст для поиска", exact: true })
+    .fill("прошлый");
+  await page
+    .getByRole("button", { name: "Найти сообщения", exact: true })
+    .click();
+  await expect(page.locator(".search-result")).toContainText(
+    "Документ за прошлый год",
+  );
+  await page.screenshot({
+    path: info.outputPath("search.png"),
+    animations: "disabled",
+  });
+  await page
+    .locator(".search-result")
+    .getByRole("button", { name: "Ответить", exact: true })
+    .click();
+  await expect(page.locator(".reply-bar")).toContainText(
+    "Документ за прошлый год",
+  );
+  await page.getByRole("button", { name: "Отменить", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Поиск сообщений", exact: true })
+    .click();
+  await page
+    .getByRole("textbox", { name: "Текст для поиска", exact: true })
+    .fill("несуществующий текст");
+  await page
+    .getByRole("button", { name: "Найти сообщения", exact: true })
+    .click();
+  await expect(
+    page.getByText("Сообщений не найдено", { exact: true }),
+  ).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(
+    page.getByRole("button", { name: "Поиск сообщений", exact: true }),
+  ).toBeFocused();
   await expect(page.locator(".message-row.grouped")).toHaveCount(1);
   const firstMessage = page.locator(".message-row").first();
   await firstMessage.getByLabel("Действия с сообщением").click();

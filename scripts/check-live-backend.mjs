@@ -39,6 +39,30 @@ else
     [401, 403].includes(profiles.status),
     "Profiles API must exist and reject anonymous access",
   );
+const preferences = await fetch(
+  `${url}/rest/v1/conversation_preferences?select=conversation_id&limit=1`,
+  {
+    headers: { apikey: key },
+    signal: AbortSignal.timeout(30000),
+  },
+);
+assert.ok(
+  [401, 403].includes(preferences.status),
+  "Personal preferences API must exist and reject anonymous access",
+);
+const search = await fetch(`${url}/rest/v1/rpc/search_messages`, {
+  method: "POST",
+  headers: { apikey: key, "Content-Type": "application/json" },
+  body: JSON.stringify({
+    cid: "00000000-0000-4000-8000-000000000000",
+    query_text: "health check",
+  }),
+  signal: AbortSignal.timeout(30000),
+});
+assert.ok(
+  [401, 403].includes(search.status),
+  "Message search RPC must exist and reject anonymous access",
+);
 console.log(
-  "Live Supabase checks passed: Auth reachable, email confirmation enabled, anonymous profiles denied. SMTP delivery and user-to-user messaging are not tested by this check.",
+  "Live Supabase checks passed: Auth reachable, email confirmation enabled, anonymous profiles, personal preferences and message search denied. SMTP delivery and user-to-user messaging are not tested by this check.",
 );

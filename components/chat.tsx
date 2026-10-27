@@ -35,6 +35,9 @@ import {
   X,
   Flag,
   Download,
+  Pin,
+  PinOff,
+  Folder,
 } from "lucide-react";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { getSupabase } from "../lib/supabase";
@@ -44,6 +47,7 @@ import type {
   Member,
   Message,
   Profile,
+  ConversationPreference,
 } from "../lib/types";
 import { messageSchema, usernameSchema, validateFile } from "../lib/validation";
 import Brand from "./brand";
@@ -51,6 +55,7 @@ import { errorText } from "../lib/errors";
 import { useTheme } from "../lib/use-theme";
 import { useChatPreferences } from "../lib/use-chat-preferences";
 import ChatAppearance from "./chat-appearance";
+import MessageSearch from "./message-search";
 
 function Avatar({
   name,
@@ -150,6 +155,12 @@ export default function Chat({ userId }: { userId: string }) {
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
+  const [organization, setOrganization] = useState<ConversationPreference[]>(
+    [],
+  );
+  const [folderFilter, setFolderFilter] = useState("");
+  const [folderDraft, setFolderDraft] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
   const [latest, setLatest] = useState<Message[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -167,7 +178,9 @@ export default function Chat({ userId }: { userId: string }) {
   const [hasOlder, setHasOlder] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
-  const [modal, setModal] = useState<"new" | "settings" | "group" | null>(null);
+  const [modal, setModal] = useState<
+    "new" | "settings" | "group" | "folder" | null
+  >(null);
   const [search, setSearch] = useState("");
   const [found, setFound] = useState<Profile | null>(null);
   const [groupTitle, setGroupTitle] = useState("");
@@ -186,6 +199,11 @@ export default function Chat({ userId }: { userId: string }) {
   const [retryPending, setRetryPending] = useState(false);
   const closeModal = useCallback(() => setModal(null), []);
   const appMenuRef = useRef<HTMLDetailsElement>(null);
+  const messageSearchButtonRef = useRef<HTMLButtonElement>(null);
+  const closeSearch = useCallback(() => {
+    setSearchOpen(false);
+    messageSearchButtonRef.current?.focus();
+  }, []);
   const channelRef = useRef<RealtimeChannel | null>(null);
   const lastTyping = useRef(0);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -221,15 +239,53 @@ export default function Chat({ userId }: { userId: string }) {
           )?.display_name || "Личный чат",
     [profiles, members, userId],
   );
+  const folders = [
+    ...new Set(
+      organization
+        .map((item) => item.folder)
+        .filter((folder): folder is string => !!folder),
+    ),
+  ].sort((a, b) => a.localeCompare(b, "ru"));
+  const currentPreference = organization.find(
+    (item) => item.conversation_id === selected,
+  );
+  const visibleConversations = conversations
+    .filter(
+      (conversation) =>
+        (chatKind === "all" || conversation.kind === chatKind) &&
+        nameOf(conversation).toLowerCase().includes(filter.toLowerCase()) &&
+        (!folderFilter ||
+          organization.some(
+            (item) =>
+              item.conversation_id === conversation.id &&
+              item.folder === folderFilter,
+          )),
+    )
+    .sort(
+      (a, b) =>
+        Number(
+          organization.some(
+            (item) => item.conversation_id === b.id && item.pinned,
+          ),
+        ) -
+        Number(
+          organization.some(
+            (item) => item.conversation_id === a.id && item.pinned,
+          ),
+        ),
+    );
   const refresh = useCallback(async () => {
-    const [p, c, m, ps, b] = await Promise.all([
+    const [p, c, m, ps, b, cp] = await Promise.all([
       client.from("profiles").select("*").eq("id", userId).single(),
       client.rpc("list_conversations"),
       client.from("conversation_members").select("*"),
       client.from("profiles").select("*"),
       client.from("blocks").select("blocked_id"),
+      client.from("conversation_preferences").select("*"),
     ]);
-    for (const result of [p, c, m, ps, b]) if (result.error) throw result.error;
+    for (const result of [p, c, m, ps, b, cp])
+      if (result.error) throw result.error;
+    setOrganization(cp.data || []);
     setProfile(p.data);
     setConversations(c.data || []);
     setMembers(m.data || []);
@@ -535,6 +591,7 @@ export default function Chat({ userId }: { userId: string }) {
     activeRef.current = id;
     setSelected(id);
     setTyping(false);
+    setSearchOpen(false);
     setRetryPending(false);
     pendingMessage.current = null;
     setMessages([]);
@@ -796,101 +853,111 @@ export default function Chat({ userId }: { userId: string }) {
             </button>
           ))}
         </div>
+        {(folders.length > 0 || folderFilter) && (
+          <label className="folder-filter">
+            <Folder size={16} />
+            <select
+              aria-label="Папка чатов"
+              value={folderFilter}
+              onChange={(event) => setFolderFilter(event.target.value)}
+            >
+              <option value="">Все папки</option>
+              {folders.map((folder) => (
+                <option value={folder} key={folder}>
+                  {folder}
+                </option>
+              ))}
+              {folderFilter && !folders.includes(folderFilter) && (
+                <option value={folderFilter}>{folderFilter}</option>
+              )}
+            </select>
+          </label>
+        )}
         <nav aria-label="Чаты" className="conversation-list">
           {loading ? (
             <p className="muted loading-line">
               <LoaderCircle className="spin" size={18} /> Загружаем чаты…
             </p>
           ) : (
-            conversations
-              .filter(
-                (c) =>
-                  (chatKind === "all" || c.kind === chatKind) &&
-                  nameOf(c).toLowerCase().includes(filter.toLowerCase()),
-              )
-              .map((c) => {
-                const last = latest.find((m) => m.conversation_id === c.id);
-                const own = members.find(
-                  (m) => m.conversation_id === c.id && m.user_id === userId,
-                );
-                const other = profiles.find((p) =>
-                  members.some(
-                    (m) =>
-                      m.conversation_id === c.id &&
-                      m.user_id === p.id &&
-                      p.id !== userId,
-                  ),
-                );
-                const unread =
-                  last &&
-                  last.sender_id !== userId &&
-                  own &&
-                  Date.parse(last.created_at) > Date.parse(own.last_read_at);
-                return (
-                  <button
-                    key={c.id}
-                    aria-current={c.id === selected ? "page" : undefined}
-                    onClick={() => select(c.id)}
-                    className={`conversation-item ${c.id === selected ? "active" : ""}`}
-                  >
-                    <Avatar
-                      name={nameOf(c)}
-                      path={
-                        c.kind === "group" ? c.avatar_path : other?.avatar_path
-                      }
-                      bucket={c.kind === "group" ? "group-avatars" : "avatars"}
-                    />
-                    <span className="conversation-info">
-                      <strong>{nameOf(c)}</strong>
-                      <span>
-                        {last
-                          ? last.deleted_at
-                            ? "Сообщение удалено"
-                            : last.body || "Вложение"
-                          : c.kind === "group"
-                            ? "Новая группа"
-                            : "Начните разговор"}
-                      </span>
+            visibleConversations.map((c) => {
+              const last = latest.find((m) => m.conversation_id === c.id);
+              const own = members.find(
+                (m) => m.conversation_id === c.id && m.user_id === userId,
+              );
+              const other = profiles.find((p) =>
+                members.some(
+                  (m) =>
+                    m.conversation_id === c.id &&
+                    m.user_id === p.id &&
+                    p.id !== userId,
+                ),
+              );
+              const unread =
+                last &&
+                last.sender_id !== userId &&
+                own &&
+                Date.parse(last.created_at) > Date.parse(own.last_read_at);
+              return (
+                <button
+                  key={c.id}
+                  aria-current={c.id === selected ? "page" : undefined}
+                  onClick={() => select(c.id)}
+                  className={`conversation-item ${c.id === selected ? "active" : ""}`}
+                >
+                  <Avatar
+                    name={nameOf(c)}
+                    path={
+                      c.kind === "group" ? c.avatar_path : other?.avatar_path
+                    }
+                    bucket={c.kind === "group" ? "group-avatars" : "avatars"}
+                  />
+                  <span className="conversation-info">
+                    <strong>{nameOf(c)}</strong>
+                    <span>
+                      {last
+                        ? last.deleted_at
+                          ? "Сообщение удалено"
+                          : last.body || "Вложение"
+                        : c.kind === "group"
+                          ? "Новая группа"
+                          : "Начните разговор"}
                     </span>
-                    <span className="conversation-meta">
-                      {last && (
-                        <time>
-                          {new Date(last.created_at).toLocaleTimeString("ru", {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })}
-                        </time>
-                      )}
-                      {unread && (
-                        <i aria-label="Есть непрочитанные сообщения" />
-                      )}
-                    </span>
-                  </button>
-                );
-              })
-          )}
-          {!loading &&
-            !conversations.filter(
-              (c) =>
-                (chatKind === "all" || c.kind === chatKind) &&
-                nameOf(c).toLowerCase().includes(filter.toLowerCase()),
-            ).length && (
-              <div className="empty-list">
-                <MessageCircle size={28} />
-                <p>
-                  {filter
-                    ? "Чаты не найдены"
-                    : chatKind === "group"
-                      ? "У вас пока нет групп"
-                      : chatKind === "direct"
-                        ? "Нет личных чатов"
-                        : "У вас пока нет чатов"}
-                </p>
-                <button className="text-button" onClick={() => setModal("new")}>
-                  Найти человека
+                  </span>
+                  <span className="conversation-meta">
+                    {organization.some(
+                      (item) => item.conversation_id === c.id && item.pinned,
+                    ) && <Pin size={12} aria-label="Закреплённый чат" />}
+                    {last && (
+                      <time>
+                        {new Date(last.created_at).toLocaleTimeString("ru", {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </time>
+                    )}
+                    {unread && <i aria-label="Есть непрочитанные сообщения" />}
+                  </span>
                 </button>
-              </div>
-            )}
+              );
+            })
+          )}
+          {!loading && !visibleConversations.length && (
+            <div className="empty-list">
+              <MessageCircle size={28} />
+              <p>
+                {filter || folderFilter
+                  ? "Чаты не найдены"
+                  : chatKind === "group"
+                    ? "У вас пока нет групп"
+                    : chatKind === "direct"
+                      ? "Нет личных чатов"
+                      : "У вас пока нет чатов"}
+              </p>
+              <button className="text-button" onClick={() => setModal("new")}>
+                Найти человека
+              </button>
+            </div>
+          )}
         </nav>
         <button
           className="compose-fab"
@@ -985,6 +1052,15 @@ export default function Chat({ userId }: { userId: string }) {
               >
                 {connected ? "На связи" : "Подключение…"}
               </span>
+              <button
+                className="icon-button"
+                ref={messageSearchButtonRef}
+                aria-label="Поиск сообщений"
+                aria-expanded={searchOpen}
+                onClick={() => setSearchOpen((value) => !value)}
+              >
+                <Search size={21} />
+              </button>
               <div className="menu-wrap">
                 <button
                   className="icon-button"
@@ -996,6 +1072,38 @@ export default function Chat({ userId }: { userId: string }) {
                 </button>
                 {menu && (
                   <div className="dropdown">
+                    <button
+                      disabled={busy}
+                      onClick={() =>
+                        void run(async () => {
+                          await rpc("set_chat_preferences", {
+                            cid: selected,
+                            pinned_value: !currentPreference?.pinned,
+                          });
+                          setMenu(false);
+                          await refresh();
+                        })
+                      }
+                    >
+                      {currentPreference?.pinned ? (
+                        <PinOff size={16} />
+                      ) : (
+                        <Pin size={16} />
+                      )}
+                      {currentPreference?.pinned
+                        ? "Открепить чат"
+                        : "Закрепить чат"}
+                    </button>
+                    <button
+                      onClick={() => {
+                        setFolderDraft(currentPreference?.folder || "");
+                        setModal("folder");
+                        setMenu(false);
+                      }}
+                    >
+                      <Folder size={16} />В папку
+                    </button>
+
                     {current.kind === "group" ? (
                       <>
                         <button
@@ -1045,6 +1153,20 @@ export default function Chat({ userId }: { userId: string }) {
                 )}
               </div>
             </header>
+            {searchOpen && (
+              <MessageSearch
+                key={selected}
+                conversationId={selected!}
+                profiles={profiles}
+                onClose={closeSearch}
+                onReply={(message) => {
+                  setReply(message);
+                  setEditing(null);
+                  setSearchOpen(false);
+                  composerRef.current?.focus();
+                }}
+              />
+            )}
             <div
               className="message-scroll"
               role="log"
@@ -1427,11 +1549,18 @@ export default function Chat({ userId }: { userId: string }) {
             title={
               modal === "settings"
                 ? "Настройки"
-                : modal === "group"
-                  ? "О группе"
-                  : "Новый чат"
+                : modal === "folder"
+                  ? "Папка для чата"
+                  : modal === "group"
+                    ? "О группе"
+                    : "Новый чат"
             }
             onClose={closeModal}
+            returnFocusSelector={
+              modal === "folder" || modal === "group"
+                ? '[aria-label="Действия с чатом"]'
+                : undefined
+            }
           >
             {modal === "settings" ? (
               <>
@@ -1550,6 +1679,50 @@ export default function Chat({ userId }: { userId: string }) {
               </>
             ) : (
               <>
+                {modal === "folder" && (
+                  <form
+                    onSubmit={(event) => {
+                      event.preventDefault();
+                      void run(async () => {
+                        await rpc("set_chat_preferences", {
+                          cid: selected,
+                          folder_value: folderDraft.trim(),
+                          set_folder: true,
+                        });
+                        await refresh();
+                        setFolderFilter("");
+                        setModal(null);
+                      });
+                    }}
+                  >
+                    <p className="muted small">
+                      Папки видны только вам. У чата может быть одна папка.
+                    </p>
+                    <label>
+                      Название папки
+                      <input
+                        autoFocus
+                        value={folderDraft}
+                        onChange={(event) => setFolderDraft(event.target.value)}
+                        maxLength={24}
+                        list="chat-folders"
+                        placeholder="Например, Работа"
+                      />
+                    </label>
+                    <datalist id="chat-folders">
+                      {folders.map((folder) => (
+                        <option key={folder} value={folder} />
+                      ))}
+                    </datalist>
+                    <p className="settings-caption">
+                      Оставьте поле пустым, чтобы убрать чат из папки. Пустые
+                      папки исчезают автоматически.
+                    </p>
+                    <button className="primary" disabled={busy}>
+                      Сохранить папку
+                    </button>
+                  </form>
+                )}
                 {modal === "new" && (
                   <>
                     <p className="muted">
@@ -1793,10 +1966,12 @@ export default function Chat({ userId }: { userId: string }) {
 function ModalFrame({
   title,
   onClose,
+  returnFocusSelector,
   children,
 }: {
   title: string;
   onClose: () => void;
+  returnFocusSelector?: string;
   children: React.ReactNode;
 }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -1809,9 +1984,9 @@ function ModalFrame({
       if (e.key === "Tab" && container) {
         const nodes = Array.from(
           container.querySelectorAll<HTMLElement>(
-            "button:not(:disabled), input:not(:disabled), a[href], textarea:not(:disabled)",
+            "button:not(:disabled), input:not(:disabled), select:not(:disabled), a[href], textarea:not(:disabled)",
           ),
-        );
+        ).filter((node) => node.getClientRects().length);
         const first = nodes[0],
           last = nodes[nodes.length - 1];
         if (e.shiftKey && document.activeElement === first) {
@@ -1828,6 +2003,9 @@ function ModalFrame({
       document.removeEventListener("keydown", key);
       // Disclosure actions become hidden after opening a dialog; return to their summary.
       const fallback =
+        (returnFocusSelector
+          ? document.querySelector<HTMLElement>(returnFocusSelector)
+          : undefined) ||
         previous?.closest("details")?.querySelector<HTMLElement>("summary") ||
         document.querySelector<HTMLElement>(".app-menu > summary");
       const disclosure = previous?.closest("details");
@@ -1841,7 +2019,7 @@ function ModalFrame({
         previous.focus();
       else fallback?.focus();
     };
-  }, [onClose]);
+  }, [onClose, returnFocusSelector]);
   return (
     <div
       className="modal"
