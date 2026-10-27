@@ -1,41 +1,41 @@
 @import "tailwindcss";
 :root {
-  --bg: #0d101b;
-  --panel: #121624;
-  --panel-soft: #171c2d;
-  --input: #191e30;
-  --line: #262c40;
-  --text: #edf0fa;
-  --muted: #969fb7;
-  --accent: #b3a0e6;
-  --accent-strong: #7c5ec8;
-  --accent-tint: #28223f;
-  --bubble: #232a40;
-  --mine: #514080;
+  --bg: #0e1621;
+  --panel: #17212b;
+  --panel-soft: #202b36;
+  --input: #242f3d;
+  --line: #253341;
+  --text: #f5f5f5;
+  --muted: #91a3b5;
+  --accent: #6ab2f2;
+  --accent-strong: #2b5278;
+  --accent-tint: #223b51;
+  --bubble: #182533;
+  --mine: #2b5278;
   --danger: #ff9dba;
   --success: #8dd9be;
   --shadow: 0 8px 32px #0003;
   --on-accent: #fff;
-  --action: #8064c7;
+  --action: #5288c1;
   color-scheme: dark;
 }
 :root[data-theme="light"] {
-  --bg: #f6f5fa;
+  --bg: #dce8ee;
   --panel: #fff;
-  --panel-soft: #f0eef7;
-  --input: #f0eef7;
-  --line: #e2dfec;
-  --text: #27233a;
-  --muted: #726c84;
-  --accent: #7051bd;
-  --accent-strong: #7250bf;
-  --accent-tint: #ede7fa;
+  --panel-soft: #f1f3f5;
+  --input: #f1f3f5;
+  --line: #e5e8eb;
+  --text: #19232d;
+  --muted: #748391;
+  --accent: #247cb4;
+  --accent-strong: #2789c9;
+  --accent-tint: #e4f1f9;
   --bubble: #fff;
-  --mine: #e6dcfa;
+  --mine: #dcf8c6;
   --danger: #b12f56;
   --success: #1d7559;
   --on-accent: #fff;
-  --action: #7250bf;
+  --action: #2789c9;
   color-scheme: light;
 }
 * {
@@ -462,7 +462,7 @@ svg {
   overflow: hidden;
 }
 .sidebar {
-  width: 360px;
+  width: 400px;
   min-width: 300px;
   position: relative;
   background: var(--panel);
@@ -492,7 +492,7 @@ svg {
 .conversation-list {
   flex: 1;
   overflow-y: auto;
-  padding: 5px 0 84px;
+  padding: 6px 8px 84px;
   display: flex;
   flex-direction: column;
 }
@@ -500,9 +500,9 @@ svg {
   display: flex;
   align-items: center;
   width: 100%;
-  padding: 12px 16px;
+  padding: 10px 9px;
   gap: 12px;
-  border-radius: 0;
+  border-radius: 10px;
   flex-shrink: 0;
   text-align: left;
   margin-bottom: 0;
@@ -539,7 +539,7 @@ svg {
 }
 .conversation-info strong {
   display: block;
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 600;
   white-space: nowrap;
   overflow: hidden;
@@ -548,7 +548,7 @@ svg {
 .conversation-info > span {
   display: block;
   font-size: 14px;
-  margin-top: 6px;
+  margin-top: 5px;
   color: var(--muted);
   white-space: nowrap;
   overflow: hidden;
@@ -595,7 +595,7 @@ svg {
   display: flex;
   flex-direction: column;
   position: relative;
-  background: var(--chat-surface, #0d101b);
+  background: var(--chat-surface, #0e1621);
 }
 .chat-welcome {
   margin: auto;
@@ -629,7 +629,7 @@ svg {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 12px 24px;
+  padding: 9px 24px;
   border-bottom: 1px solid var(--line);
   background: var(--panel);
   min-height: 66px;
@@ -712,11 +712,11 @@ svg {
 }
 .day-divider {
   text-align: center;
-  margin: 8px 0 25px;
+  margin: 8px 0 18px;
 }
 .day-divider span,
 .day-label {
-  font-size: 10px;
+  font-size: 12px;
   background: var(--panel-soft);
   border: 0;
   border-radius: 20px;
@@ -739,12 +739,12 @@ svg {
   background: var(--bubble);
   border: 0;
   padding: 9px 12px 6px;
-  border-radius: 12px 12px 12px 4px;
+  border-radius: 12px 12px 12px 3px;
   overflow-wrap: anywhere;
 }
 .mine .bubble {
   background: var(--mine);
-  border-radius: 12px 12px 4px 12px;
+  border-radius: 12px 12px 3px 12px;
 }
 .bubble > p {
   white-space: pre-wrap;
@@ -763,7 +763,7 @@ svg {
   align-items: center;
   justify-content: end;
   gap: 5px;
-  font-size: 10px;
+  font-size: 11px;
   opacity: 0.8;
   white-space: nowrap;
 }
@@ -1489,13 +1489,13 @@ svg {
 
 .chat-filters {
   display: flex;
-  gap: 25px;
-  padding: 0 20px;
+  gap: 8px;
+  padding: 0 12px;
   border-bottom: 1px solid var(--line);
 }
 .chat-filters button {
   position: relative;
-  padding: 12px 1px 14px;
+  padding: 12px 16px 14px;
   font-size: 13px;
   color: var(--muted);
   font-weight: 600;
@@ -1506,8 +1506,8 @@ svg {
 .chat-filters button[aria-pressed="true"]:after {
   content: "";
   position: absolute;
-  left: 0;
-  right: 0;
+  left: 12px;
+  right: 12px;
   bottom: 0;
   height: 3px;
   border-radius: 3px 3px 0 0;
@@ -1616,7 +1616,7 @@ svg {
 .chat-wallpaper {
   position: absolute;
   inset: 0;
-  opacity: 0.045;
+  opacity: 0.025;
   background-size: 440px 360px;
   pointer-events: none;
 }
@@ -1683,4 +1683,80 @@ svg {
 .composer .file-label,
 .composer .emoji-wrap {
   justify-self: center;
+}
+
+/* Familiar messenger proportions, with Averiq's own assets. */
+.chat-heading h2 {
+  font-size: 16px;
+  margin-bottom: 3px;
+}
+.chat-heading > span {
+  font-size: 13px;
+}
+.bubble {
+  box-shadow: 0 1px 2px #0002;
+}
+.chat-welcome h2 {
+  background: var(--panel-soft);
+  padding: 8px 18px;
+  border-radius: 24px;
+  font-size: 14px;
+  letter-spacing: 0;
+}
+.chat-welcome .welcome-symbol,
+.chat-welcome > p {
+  display: none;
+}
+.chat-welcome .text-button {
+  margin-top: 4px;
+}
+.app-menu-brand {
+  padding: 10px;
+}
+.app-menu-profile {
+  padding: 16px 10px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 6px;
+}
+.app-menu-profile .avatar {
+  width: 48px;
+  height: 48px;
+}
+.app-menu-panel > button {
+  font-size: 14px;
+}
+.composer-hint {
+  height: 0;
+  margin: 0;
+  overflow: hidden;
+}
+.composer-area {
+  padding-bottom: 20px;
+}
+@media (min-width: 1400px) {
+  .sidebar {
+    width: 420px;
+  }
+}
+@media (max-width: 700px) {
+  .conversation-list {
+    padding: 4px 0 84px;
+  }
+  .conversation-item {
+    border-radius: 0;
+    padding: 11px 16px;
+  }
+  .chat-header {
+    padding: 9px 12px;
+  }
+  .chat-header .avatar {
+    width: 42px;
+    height: 42px;
+  }
+  .composer-area {
+    padding-bottom: max(10px, env(safe-area-inset-bottom));
+  }
+  .app-menu-panel {
+    border-radius: 10px;
+  }
 }
