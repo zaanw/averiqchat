@@ -141,15 +141,18 @@ test("chat filters, mobile navigation, grouped messages, composer and theme", as
   });
   await page.goto("/averiqchat/");
   await expect(page.locator(".conversation-item")).toHaveCount(2);
-  await page.getByRole("button", { name: "Личные", exact: true }).click();
-  await expect(page.locator(".conversation-item")).toHaveCount(1);
   await expect(
-    page.getByRole("button", { name: "Личные", exact: true }),
-  ).toHaveAttribute("aria-pressed", "true");
-  await page.getByRole("button", { name: "Группы", exact: true }).click();
+    page.getByRole("heading", { name: "Сообщения", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Новый чат", exact: true }).first(),
+  ).toBeVisible();
+  await page.getByRole("combobox", { name: "Тип чата" }).selectOption("direct");
+  await expect(page.locator(".conversation-item")).toHaveCount(1);
+  await page.getByRole("combobox", { name: "Тип чата" }).selectOption("group");
   await expect(page.locator(".conversation-item")).toHaveCount(1);
   await expect(page.locator(".conversation-item")).toContainText("Команда");
-  await page.getByRole("button", { name: "Все", exact: true }).click();
+  await page.getByRole("combobox", { name: "Тип чата" }).selectOption("all");
   await page.getByRole("textbox", { name: "Фильтр чатов" }).fill("Алина");
   await expect(page.locator(".conversation-item")).toHaveCount(1);
   await page.locator(".conversation-item").click();
@@ -188,9 +191,41 @@ test("chat filters, mobile navigation, grouped messages, composer and theme", as
       page.getByRole("textbox", { name: "Фильтр чатов" }),
     ).toBeVisible();
   }
-  await page.getByRole("button", { name: "Открыть настройки" }).click();
+  await page.getByRole("button", { name: "Настройки", exact: true }).click();
   await page.getByRole("button", { name: "Светлая тема", exact: true }).click();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+  await page.getByRole("button", { name: "Тёмная тема", exact: true }).click();
   await page.keyboard.press("Escape");
   await expect(page.getByRole("dialog")).toHaveCount(0);
+  conversations.splice(0);
+  members.splice(0);
+  messages.splice(0);
+  await page.reload();
+  await expect(page.locator(".empty-list")).toContainText(
+    "У вас пока нет чатов",
+  );
+  if (info.project.name === "desktop") {
+    await page.setViewportSize({ width: 1920, height: 960 });
+    expect(
+      await page
+        .locator(".chat-app")
+        .evaluate((element) => element.getBoundingClientRect().width),
+    ).toBe(1920);
+    await expect(
+      page.getByRole("heading", { name: "Выберите чат", exact: true }),
+    ).toBeVisible();
+  }
+  await page.screenshot({
+    path: info.outputPath("empty.png"),
+    animations: "disabled",
+  });
+  await page
+    .getByRole("button", { name: "Новый чат", exact: true })
+    .first()
+    .click();
+  await expect(page.getByRole("dialog")).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Новый чат", exact: true }),
+  ).toBeVisible();
+  await page.keyboard.press("Escape");
 });

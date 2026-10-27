@@ -4,8 +4,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ArrowLeft,
   SendHorizontal,
-  Menu,
-  PenLine,
   Check,
   CheckCheck,
   FileText,
@@ -663,51 +661,46 @@ export default function Chat({ userId }: { userId: string }) {
     <main className={`chat-app ${selected ? "has-selection" : ""}`}>
       <aside className="sidebar">
         <header className="sidebar-top">
+          <Brand />
           <button
             className="icon-button"
-            aria-label="Открыть настройки"
-            onClick={() => setModal("settings")}
+            aria-label="Новый чат"
+            title="Новый чат"
+            onClick={() => {
+              setModal("new");
+              setFound(null);
+              setSearch("");
+              setGroupPeople([]);
+              setGroupTitle("");
+            }}
           >
-            <Menu size={23} />
+            <Plus size={22} />
           </button>
-          <Brand />
-          <span
-            className="sidebar-total"
-            aria-label={`${conversations.length} чатов`}
-          >
-            {conversations.length}
-          </span>
         </header>
-        <h1 className="sr-only">Сообщения</h1>
+        <div className="sidebar-heading">
+          <h1>Сообщения</h1>
+          <span>{conversations.length}</span>
+          <select
+            className="chat-type-select"
+            aria-label="Тип чата"
+            value={chatKind}
+            onChange={(event) =>
+              setChatKind(event.target.value as "all" | "direct" | "group")
+            }
+          >
+            <option value="all">Все</option>
+            <option value="direct">Личные</option>
+            <option value="group">Группы</option>
+          </select>
+        </div>
         <div className="sidebar-search input-icon">
-          <Search size={19} />
+          <Search size={17} />
           <input
             aria-label="Фильтр чатов"
-            placeholder="Поиск"
+            placeholder="Найти разговор…"
             value={filter}
-            onChange={(e) => setFilter(e.target.value)}
+            onChange={(event) => setFilter(event.target.value)}
           />
-        </div>
-        <div
-          className="chat-filters"
-          role="group"
-          aria-label="Фильтр по типу чата"
-        >
-          {(
-            [
-              { value: "all", label: "Все" },
-              { value: "direct", label: "Личные" },
-              { value: "group", label: "Группы" },
-            ] as const
-          ).map((tab) => (
-            <button
-              key={tab.value}
-              aria-pressed={chatKind === tab.value}
-              onClick={() => setChatKind(tab.value)}
-            >
-              {tab.label}
-            </button>
-          ))}
         </div>
         <nav aria-label="Чаты" className="conversation-list">
           {loading ? (
@@ -805,20 +798,6 @@ export default function Chat({ userId }: { userId: string }) {
               </div>
             )}
         </nav>
-        <button
-          className="compose-fab"
-          aria-label="Новый чат"
-          title="Новый чат"
-          onClick={() => {
-            setModal("new");
-            setFound(null);
-            setSearch("");
-            setGroupPeople([]);
-            setGroupTitle("");
-          }}
-        >
-          <PenLine size={23} />
-        </button>
         <footer className="sidebar-profile">
           <button
             className="profile-button"
@@ -864,10 +843,16 @@ export default function Chat({ userId }: { userId: string }) {
         )}
         {!current ? (
           <div className="chat-welcome">
-            <MessageCircle size={30} strokeWidth={1.25} aria-hidden="true" />
+            <div className="welcome-symbol">
+              <MessageCircle size={38} strokeWidth={1.4} aria-hidden="true" />
+            </div>
             <h2>Выберите чат</h2>
-            <p>Или найдите собеседника по юзернейму.</p>
-            <button className="text-button" onClick={() => setModal("new")}>
+            <p>
+              Найдите собеседника по юзернейму
+              <br />
+              или создайте группу.
+            </p>
+            <button className="primary" onClick={() => setModal("new")}>
               <Plus size={16} />
               Новый чат
             </button>
