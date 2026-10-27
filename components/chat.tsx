@@ -1,6 +1,12 @@
 "use client";
 /* eslint-disable @next/next/no-img-element -- Private signed Storage URLs must not pass through a shared optimizer. */
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+} from "react";
 import {
   ArrowLeft,
   Menu,
@@ -43,6 +49,8 @@ import { messageSchema, usernameSchema, validateFile } from "../lib/validation";
 import Brand from "./brand";
 import { errorText } from "../lib/errors";
 import { useTheme } from "../lib/use-theme";
+import { useChatPreferences } from "../lib/use-chat-preferences";
+import ChatAppearance from "./chat-appearance";
 
 function Avatar({
   name,
@@ -168,6 +176,11 @@ export default function Chat({ userId }: { userId: string }) {
   const [typing, setTyping] = useState(false);
   const [emojiOpen, setEmojiOpen] = useState(false);
   const { light, toggleTheme } = useTheme();
+  const { preferences, updatePreferences, resetPreferences, storageAvailable } =
+    useChatPreferences(userId);
+  const [settingsSection, setSettingsSection] = useState<
+    "profile" | "appearance" | "security"
+  >("profile");
   const [menu, setMenu] = useState(false);
   const [attachmentPending, setAttachmentPending] = useState(false);
   const [retryPending, setRetryPending] = useState(false);
@@ -469,6 +482,10 @@ export default function Chat({ userId }: { userId: string }) {
     };
   }, [client, selected, userId, refresh]);
   useEffect(() => {
+    if (!preferences.showTyping && selected)
+      void channelRef.current?.track({ typing: false, at: Date.now() });
+  }, [preferences.showTyping, selected]);
+  useEffect(() => {
     const input = composerRef.current;
     if (!input) return;
     input.style.height = "0px";
@@ -680,7 +697,15 @@ export default function Chat({ userId }: { userId: string }) {
     });
   }
   return (
-    <main className={`chat-app ${selected ? "has-selection" : ""}`}>
+    <main
+      className={`chat-app ${selected ? "has-selection" : ""}`}
+      data-accent={preferences.accent}
+      data-compact={preferences.compact}
+      data-wallpaper={preferences.wallpaper}
+      style={
+        { "--message-font-size": `${preferences.fontSize}px` } as CSSProperties
+      }
+    >
       <aside className="sidebar">
         <header className="sidebar-top">
           <details
@@ -1310,7 +1335,10 @@ export default function Chat({ userId }: { userId: string }) {
                     rows={1}
                     onChange={(e) => {
                       setDraft(e.target.value);
-                      if (Date.now() - lastTyping.current > 1500) {
+                      if (
+                        preferences.showTyping &&
+                        Date.now() - lastTyping.current > 1500
+                      ) {
                         lastTyping.current = Date.now();
                         void channelRef.current?.track({
                           typing: true,
@@ -1322,6 +1350,9 @@ export default function Chat({ userId }: { userId: string }) {
                       if (
                         e.key === "Enter" &&
                         !e.shiftKey &&
+                        (preferences.sendShortcut === "enter" ||
+                          e.ctrlKey ||
+                          e.metaKey) &&
                         !e.nativeEvent.isComposing
                       ) {
                         e.preventDefault();
@@ -1376,7 +1407,9 @@ export default function Chat({ userId }: { userId: string }) {
                 </form>
               )}
               <div className="composer-hint">
-                Enter — отправить · Shift + Enter — новая строка
+                {preferences.sendShortcut === "enter"
+                  ? "Enter — отправить · Shift + Enter — новая строка"
+                  : "Ctrl / ⌘ + Enter — отправить · Enter — новая строка"}
                 <span>Вложения до 10 МБ</span>
               </div>
             </div>
@@ -1393,7 +1426,7 @@ export default function Chat({ userId }: { userId: string }) {
           <ModalFrame
             title={
               modal === "settings"
-                ? "Ваш профиль"
+                ? "Настройки"
                 : modal === "group"
                   ? "О группе"
                   : "Новый чат"
@@ -1402,84 +1435,118 @@ export default function Chat({ userId }: { userId: string }) {
           >
             {modal === "settings" ? (
               <>
-                <div className="settings-avatar">
-                  <Avatar
-                    name={profile?.display_name || "A"}
-                    path={profile?.avatar_path}
-                  />
-                  <label className="text-button">
-                    <ImagePlus size={17} /> Изменить аватар
-                    <input
-                      type="file"
-                      aria-label="Аватар профиля"
-                      accept="image/jpeg,image/png,image/webp"
-                      onChange={(e) => {
-                        const f = e.target.files?.[0];
-                        if (f) void run(() => uploadAvatar(f));
-                        e.target.value = "";
-                      }}
-                    />
-                  </label>
+                <div
+                  className="settings-sections"
+                  role="group"
+                  aria-label="Раздел настроек"
+                >
+                  {(
+                    [
+                      { value: "profile", label: "Профиль" },
+                      { value: "appearance", label: "Чаты" },
+                      { value: "security", label: "Безопасность" },
+                    ] as const
+                  ).map((section) => (
+                    <button
+                      key={section.value}
+                      aria-pressed={settingsSection === section.value}
+                      onClick={() => setSettingsSection(section.value)}
+                    >
+                      {section.label}
+                    </button>
+                  ))}
                 </div>
-                <form onSubmit={saveProfile}>
-                  <label>
-                    Отображаемое имя
-                    <input
-                      name="display_name"
-                      defaultValue={profile?.display_name}
-                      required
-                      maxLength={60}
-                    />
-                  </label>
-                  <label>
-                    Юзернейм
-                    <input
-                      name="username"
-                      defaultValue={profile?.username}
-                      required
-                      minLength={3}
-                      maxLength={24}
-                    />
-                  </label>
-                  <button className="primary" disabled={busy}>
-                    Сохранить профиль
-                  </button>
-                </form>
-                <div className="settings-divider" />
-                <button className="settings-action" onClick={toggleTheme}>
-                  {light ? <Moon size={18} /> : <Sun size={18} />}{" "}
-                  {light ? "Тёмная тема" : "Светлая тема"}
-                </button>
-                <button
-                  className="settings-action"
-                  onClick={() =>
-                    void run(async () => {
-                      const { error } = await client.auth.signOut({
-                        scope: "local",
-                      });
-                      if (error) throw error;
-                    })
-                  }
-                >
-                  <LogOut size={18} /> Выйти на этом устройстве
-                </button>
-                <button
-                  className="settings-action danger"
-                  onClick={() =>
-                    void run(async () => {
-                      const { error } = await client.auth.signOut({
-                        scope: "global",
-                      });
-                      if (error) throw error;
-                    })
-                  }
-                >
-                  Завершить все сессии
-                </button>
-                <small className="muted">
-                  Уже выданный access token действует до своего истечения.
-                  Используйте короткий срок JWT в Supabase.
-                </small>
+                {settingsSection === "profile" && (
+                  <div className="settings-section">
+                    <div className="settings-avatar">
+                      <Avatar
+                        name={profile?.display_name || "A"}
+                        path={profile?.avatar_path}
+                      />
+                      <label className="text-button">
+                        <ImagePlus size={17} /> Изменить аватар
+                        <input
+                          type="file"
+                          aria-label="Аватар профиля"
+                          accept="image/jpeg,image/png,image/webp"
+                          onChange={(e) => {
+                            const f = e.target.files?.[0];
+                            if (f) void run(() => uploadAvatar(f));
+                            e.target.value = "";
+                          }}
+                        />
+                      </label>
+                    </div>
+                    <form onSubmit={saveProfile}>
+                      <label>
+                        Отображаемое имя
+                        <input
+                          name="display_name"
+                          defaultValue={profile?.display_name}
+                          required
+                          maxLength={60}
+                        />
+                      </label>
+                      <label>
+                        Юзернейм
+                        <input
+                          name="username"
+                          defaultValue={profile?.username}
+                          required
+                          minLength={3}
+                          maxLength={24}
+                        />
+                      </label>
+                      <button className="primary" disabled={busy}>
+                        Сохранить профиль
+                      </button>
+                    </form>
+                  </div>
+                )}
+                {settingsSection === "appearance" && (
+                  <ChatAppearance
+                    preferences={preferences}
+                    updatePreferences={updatePreferences}
+                    resetPreferences={resetPreferences}
+                    light={light}
+                    toggleTheme={toggleTheme}
+                    storageAvailable={storageAvailable}
+                  />
+                )}
+                {settingsSection === "security" && (
+                  <div className="settings-section">
+                    <h3>Аккаунт и устройства</h3>
+                    <button
+                      className="settings-action"
+                      onClick={() =>
+                        void run(async () => {
+                          const { error } = await client.auth.signOut({
+                            scope: "local",
+                          });
+                          if (error) throw error;
+                        })
+                      }
+                    >
+                      <LogOut size={18} /> Выйти на этом устройстве
+                    </button>
+                    <button
+                      className="settings-action danger"
+                      onClick={() =>
+                        void run(async () => {
+                          const { error } = await client.auth.signOut({
+                            scope: "global",
+                          });
+                          if (error) throw error;
+                        })
+                      }
+                    >
+                      Завершить все сессии
+                    </button>
+                    <small className="muted">
+                      На других устройствах выход может произойти не сразу.
+                    </small>
+                  </div>
+                )}
               </>
             ) : (
               <>

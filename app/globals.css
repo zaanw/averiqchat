@@ -1760,3 +1760,215 @@ svg {
     border-radius: 10px;
   }
 }
+
+.chat-app[data-accent="violet"] {
+  --accent: #b3a0e6;
+  --accent-strong: #6c52ad;
+  --accent-tint: #28223f;
+  --mine: #514080;
+  --action: #8064c7;
+}
+.chat-app[data-accent="green"] {
+  --accent: #80d4b1;
+  --accent-strong: #28624f;
+  --accent-tint: #1d3933;
+  --mine: #285646;
+  --action: #378267;
+}
+:root[data-theme="light"] .chat-app[data-accent="violet"] {
+  --accent: #7051bd;
+  --accent-strong: #7250bf;
+  --accent-tint: #ede7fa;
+  --mine: #e6dcfa;
+  --action: #7250bf;
+}
+:root[data-theme="light"] .chat-app[data-accent="green"] {
+  --accent: #23795c;
+  --accent-strong: #28785c;
+  --accent-tint: #e3f2eb;
+  --mine: #d7eee0;
+  --action: #28785c;
+}
+.chat-app[data-wallpaper="plain"] .chat-wallpaper {
+  display: none;
+}
+.chat-app[data-compact="true"] .conversation-item {
+  padding-block: 7px;
+}
+.chat-app[data-compact="true"] .conversation-item .avatar {
+  height: 42px;
+  width: 42px;
+  font-size: 14px;
+}
+.chat-app[data-compact="true"] .conversation-info > span {
+  margin-top: 3px;
+}
+.bubble > p {
+  font-size: var(--message-font-size, 15px);
+}
+.settings-sections {
+  display: flex;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 22px;
+  gap: 6px;
+}
+.settings-sections button {
+  flex: 1;
+  padding: 12px 6px;
+  color: var(--muted);
+  border-bottom: 2px solid transparent;
+  font-size: 13px;
+}
+.settings-sections button[aria-pressed="true"] {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.settings-caption {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+  margin: 12px 0;
+}
+.settings-row {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 0;
+  margin: 0;
+  font-size: 13px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  font-weight: 400;
+}
+.settings-row > span:first-child {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.settings-row > .muted {
+  font-size: 11px;
+}
+.settings-row select {
+  max-width: 160px;
+  padding: 9px;
+  background: var(--input);
+  border: 1px solid var(--line);
+  color: var(--text);
+  border-radius: 8px;
+  font: inherit;
+}
+.preference-field {
+  padding: 0;
+  border: 0;
+  margin: 22px 0;
+  min-width: 0;
+}
+.preference-field legend {
+  margin-bottom: 14px;
+  font-size: 13px;
+}
+.accent-options {
+  display: flex;
+  gap: 8px;
+}
+.accent-option {
+  flex: 1;
+  padding: 10px 4px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 9px;
+  font-size: 11px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+}
+.accent-option[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: var(--accent-tint);
+}
+.accent-option > span {
+  height: 24px;
+  width: 24px;
+  border-radius: 50%;
+  background: #5288c1;
+}
+.accent-option.violet > span {
+  background: #8064c7;
+}
+.accent-option.green > span {
+  background: #378267;
+}
+.font-control > span {
+  display: flex;
+  justify-content: space-between;
+  font-weight: 400;
+}
+.font-control output {
+  color: var(--accent);
+}
+.font-control input {
+  accent-color: var(--action);
+  padding: 0;
+  border: 0;
+  height: 30px;
+  background: transparent;
+}
+.switch-row > span:first-child {
+  display: block;
+}
+.switch-row small {
+  display: block;
+  color: var(--muted);
+  font-weight: 400;
+  margin-top: 5px;
+  font-size: 11px;
+}
+.switch-row input {
+  appearance: none;
+  width: 36px;
+  min-width: 36px;
+  height: 22px;
+  padding: 2px;
+  margin: 0;
+  border: 0;
+  border-radius: 20px;
+  background: var(--line);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.switch-row input:before {
+  content: "";
+  display: block;
+  width: 18px;
+  height: 18px;
+  background: var(--text);
+  border-radius: 50%;
+  transition: transform 0.15s;
+}
+.switch-row input:checked {
+  background: var(--action);
+}
+.switch-row input:checked:before {
+  background: white;
+  transform: translateX(14px);
+}
+.reset-preferences {
+  margin-top: 22px;
+  font-size: 12px;
+}
+.modal:has(.settings-sections) > header {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: var(--panel);
+  padding-block: 12px;
+  margin-bottom: 0;
+}
+.settings-sections {
+  position: sticky;
+  top: 60px;
+  z-index: 2;
+  background: var(--panel);
+}

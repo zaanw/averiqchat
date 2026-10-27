@@ -90,8 +90,8 @@ test("chat filters, mobile navigation, grouped messages, composer and theme", as
       },
     },
   );
-  await page.routeWebSocket(/supabase\.co/, (ws) => ws.close());
-  await page.route(`${configuration.url}/**`, async (route) => {
+  await page.context().routeWebSocket(/supabase\.co/, (ws) => ws.close());
+  await page.context().route(`${configuration.url}/**`, async (route) => {
     const url = new URL(route.request().url()),
       path = url.pathname;
     let data: unknown = null;
@@ -199,12 +199,114 @@ test("chat filters, mobile navigation, grouped messages, composer and theme", as
   }
   await page.getByLabel("Меню Averiq").click();
   await page.getByRole("button", { name: "Настройки", exact: true }).click();
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: "Чаты", exact: true })
+    .click();
   await page.getByRole("button", { name: "Светлая тема", exact: true }).click();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
   await page.getByRole("button", { name: "Тёмная тема", exact: true }).click();
+  await page.getByRole("button", { name: "Фиолетовый", exact: true }).click();
+  await page.getByRole("slider").press("End");
+  await expect(page.getByRole("slider")).toHaveValue("20");
+  await page.getByLabel("Фон переписки").selectOption("plain");
+  await page.getByRole("switch", { name: /Компактный список/ }).check();
+  await page.getByLabel("Отправка сообщения").selectOption("mod-enter");
+  await page
+    .getByRole("switch", { name: /Показывать, что я печатаю/ })
+    .uncheck();
+  await expect(page.locator(".chat-app")).toHaveAttribute(
+    "data-accent",
+    "violet",
+  );
+  await expect(page.locator(".chat-app")).toHaveAttribute(
+    "data-compact",
+    "true",
+  );
+  await expect(page.locator(".chat-wallpaper")).toBeHidden();
+  await page.screenshot({
+    path: info.outputPath("settings.png"),
+    animations: "disabled",
+  });
   await page.keyboard.press("Escape");
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect(page.getByLabel("Меню Averiq")).toBeFocused();
+  const otherTab = await page.context().newPage();
+  await otherTab.goto("/averiqchat/");
+  await expect(otherTab.locator(".chat-app")).toHaveAttribute(
+    "data-accent",
+    "violet",
+  );
+  // Another account's preferences must not affect this account.
+  await otherTab.evaluate(() =>
+    localStorage.setItem(
+      "averiq-chat-preferences:another-user",
+      JSON.stringify({ accent: "green" }),
+    ),
+  );
+  await expect(page.locator(".chat-app")).toHaveAttribute(
+    "data-accent",
+    "violet",
+  );
+  await otherTab.evaluate((id) => {
+    const key = `averiq-chat-preferences:${id}`;
+    const preferences = JSON.parse(localStorage.getItem(key)!);
+    localStorage.setItem(
+      key,
+      JSON.stringify({ ...preferences, accent: "green" }),
+    );
+  }, me);
+  await expect(page.locator(".chat-app")).toHaveAttribute(
+    "data-accent",
+    "green",
+  );
+  await otherTab.close();
+  await page.reload();
+  await expect(page.locator(".chat-app")).toHaveAttribute(
+    "data-compact",
+    "true",
+  );
+  await expect(page.locator(".chat-app")).toHaveAttribute(
+    "data-accent",
+    "green",
+  );
+  await page.locator(".conversation-item").first().click();
+  const composer = page.getByRole("textbox", {
+    name: "Сообщение",
+    exact: true,
+  });
+  await expect(page.locator(".bubble > p").first()).toHaveCSS(
+    "font-size",
+    "20px",
+  );
+  await composer.fill("Отправка сочетанием");
+  await composer.press("Enter");
+  await expect(composer).toHaveValue("Отправка сочетанием\n");
+  await composer.press("Control+Enter");
+  await expect(
+    page.locator(".bubble").filter({ hasText: "Отправка сочетанием" }),
+  ).toBeVisible();
+  await expect(composer).toHaveValue("");
+  if (info.project.name === "mobile")
+    await page.getByRole("button", { name: "Назад к чатам" }).click();
+  await page.getByLabel("Меню Averiq").click();
+  await page.getByRole("button", { name: "Настройки", exact: true }).click();
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: "Чаты", exact: true })
+    .click();
+  await expect(
+    page.getByRole("switch", { name: /Показывать, что я печатаю/ }),
+  ).not.toBeChecked();
+  await page
+    .getByRole("button", { name: "Сбросить настройки чатов", exact: true })
+    .click();
+  await expect(page.locator(".chat-app")).toHaveAttribute(
+    "data-accent",
+    "blue",
+  );
+  await expect(page.getByRole("slider")).toHaveValue("15");
+  await page.keyboard.press("Escape");
   conversations.splice(0);
   members.splice(0);
   messages.splice(0);
