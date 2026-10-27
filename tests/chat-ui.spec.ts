@@ -141,18 +141,24 @@ test("chat filters, mobile navigation, grouped messages, composer and theme", as
   });
   await page.goto("/averiqchat/");
   await expect(page.locator(".conversation-item")).toHaveCount(2);
-  await expect(
-    page.getByRole("heading", { name: "Сообщения", exact: true }),
-  ).toBeVisible();
+  await expect(page.getByLabel("Меню Averiq")).toBeVisible();
+  await page.getByLabel("Меню Averiq").click();
+  await expect(page.locator(".app-menu")).toHaveJSProperty("open", true);
+  await page.getByRole("textbox", { name: "Фильтр чатов" }).click();
+  await expect(page.locator(".app-menu")).toHaveJSProperty("open", false);
+  await page.getByLabel("Меню Averiq").click();
+  await page.keyboard.press("Escape");
+  await expect(page.locator(".app-menu")).toHaveJSProperty("open", false);
+  await expect(page.getByLabel("Меню Averiq")).toBeFocused();
   await expect(
     page.getByRole("button", { name: "Новый чат", exact: true }).first(),
   ).toBeVisible();
-  await page.getByRole("combobox", { name: "Тип чата" }).selectOption("direct");
+  await page.getByRole("button", { name: "Личные", exact: true }).click();
   await expect(page.locator(".conversation-item")).toHaveCount(1);
-  await page.getByRole("combobox", { name: "Тип чата" }).selectOption("group");
+  await page.getByRole("button", { name: "Группы", exact: true }).click();
   await expect(page.locator(".conversation-item")).toHaveCount(1);
   await expect(page.locator(".conversation-item")).toContainText("Команда");
-  await page.getByRole("combobox", { name: "Тип чата" }).selectOption("all");
+  await page.getByRole("button", { name: "Все", exact: true }).click();
   await page.getByRole("textbox", { name: "Фильтр чатов" }).fill("Алина");
   await expect(page.locator(".conversation-item")).toHaveCount(1);
   await page.locator(".conversation-item").click();
@@ -191,12 +197,14 @@ test("chat filters, mobile navigation, grouped messages, composer and theme", as
       page.getByRole("textbox", { name: "Фильтр чатов" }),
     ).toBeVisible();
   }
+  await page.getByLabel("Меню Averiq").click();
   await page.getByRole("button", { name: "Настройки", exact: true }).click();
   await page.getByRole("button", { name: "Светлая тема", exact: true }).click();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
   await page.getByRole("button", { name: "Тёмная тема", exact: true }).click();
   await page.keyboard.press("Escape");
   await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(page.getByLabel("Меню Averiq")).toBeFocused();
   conversations.splice(0);
   members.splice(0);
   messages.splice(0);

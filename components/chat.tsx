@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ArrowLeft,
+  Menu,
+  PenLine,
   SendHorizontal,
   Check,
   CheckCheck,
@@ -170,6 +172,7 @@ export default function Chat({ userId }: { userId: string }) {
   const [attachmentPending, setAttachmentPending] = useState(false);
   const [retryPending, setRetryPending] = useState(false);
   const closeModal = useCallback(() => setModal(null), []);
+  const appMenuRef = useRef<HTMLDetailsElement>(null);
   const channelRef = useRef<RealtimeChannel | null>(null);
   const lastTyping = useRef(0);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -471,6 +474,25 @@ export default function Chat({ userId }: { userId: string }) {
     input.style.height = "0px";
     input.style.height = `${Math.min(input.scrollHeight, 144)}px`;
   }, [draft, selected]);
+  useEffect(() => {
+    const outside = (event: PointerEvent) => {
+      const menu = appMenuRef.current;
+      if (menu?.open && !menu.contains(event.target as Node)) menu.open = false;
+    };
+    const escape = (event: KeyboardEvent) => {
+      const menu = appMenuRef.current;
+      if (event.key === "Escape" && menu?.open) {
+        menu.open = false;
+        menu.querySelector("summary")?.focus();
+      }
+    };
+    document.addEventListener("pointerdown", outside);
+    document.addEventListener("keydown", escape);
+    return () => {
+      document.removeEventListener("pointerdown", outside);
+      document.removeEventListener("keydown", escape);
+    };
+  }, []);
   const newestMessageId = messages.at(-1)?.id;
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -661,46 +683,93 @@ export default function Chat({ userId }: { userId: string }) {
     <main className={`chat-app ${selected ? "has-selection" : ""}`}>
       <aside className="sidebar">
         <header className="sidebar-top">
-          <Brand />
-          <button
-            className="icon-button"
-            aria-label="Новый чат"
-            title="Новый чат"
-            onClick={() => {
-              setModal("new");
-              setFound(null);
-              setSearch("");
-              setGroupPeople([]);
-              setGroupTitle("");
+          <details
+            ref={appMenuRef}
+            className="app-menu"
+            onClick={(event) => {
+              if ((event.target as HTMLElement).closest("button"))
+                event.currentTarget.removeAttribute("open");
             }}
           >
-            <Plus size={22} />
-          </button>
+            <summary aria-label="Меню Averiq">
+              <Menu size={23} />
+            </summary>
+            <div className="app-menu-panel">
+              <div className="app-menu-brand">
+                <Brand />
+              </div>
+              <div className="app-menu-profile">
+                <Avatar
+                  name={profile?.display_name || "A"}
+                  path={profile?.avatar_path}
+                />
+                <span>
+                  <strong>{profile?.display_name || "Профиль"}</strong>
+                  <small>@{profile?.username}</small>
+                </span>
+              </div>
+              <button
+                onClick={() => {
+                  setModal("new");
+                  setFound(null);
+                  setSearch("");
+                  setGroupPeople([]);
+                  setGroupTitle("");
+                }}
+              >
+                <PenLine size={19} />
+                Новый чат
+              </button>
+              <button onClick={() => setModal("settings")}>
+                <Settings size={19} />
+                Настройки
+              </button>
+              <button onClick={toggleTheme}>
+                {light ? <Moon size={19} /> : <Sun size={19} />}{" "}
+                {light ? "Тёмная тема" : "Светлая тема"}
+              </button>
+              <button
+                onClick={() =>
+                  void run(async () => {
+                    const { error } = await client.auth.signOut({
+                      scope: "local",
+                    });
+                    if (error) throw error;
+                  })
+                }
+              >
+                <LogOut size={19} />
+                Выйти
+              </button>
+            </div>
+          </details>
+          <div className="sidebar-search input-icon">
+            <Search size={18} />
+            <input
+              aria-label="Фильтр чатов"
+              placeholder="Поиск"
+              value={filter}
+              onChange={(event) => setFilter(event.target.value)}
+            />
+          </div>
         </header>
-        <div className="sidebar-heading">
-          <h1>Сообщения</h1>
-          <span>{conversations.length}</span>
-          <select
-            className="chat-type-select"
-            aria-label="Тип чата"
-            value={chatKind}
-            onChange={(event) =>
-              setChatKind(event.target.value as "all" | "direct" | "group")
-            }
-          >
-            <option value="all">Все</option>
-            <option value="direct">Личные</option>
-            <option value="group">Группы</option>
-          </select>
-        </div>
-        <div className="sidebar-search input-icon">
-          <Search size={17} />
-          <input
-            aria-label="Фильтр чатов"
-            placeholder="Найти разговор…"
-            value={filter}
-            onChange={(event) => setFilter(event.target.value)}
-          />
+        <h1 className="sr-only">Сообщения</h1>
+        <div className="chat-filters" role="group" aria-label="Тип чата">
+          {(
+            [
+              { value: "all", label: "Все" },
+              { value: "direct", label: "Личные" },
+              { value: "group", label: "Группы" },
+            ] as const
+          ).map((tab) => (
+            <button
+              key={tab.value}
+              aria-pressed={chatKind === tab.value}
+              onClick={() => setChatKind(tab.value)}
+            >
+              {tab.label}
+            </button>
+          ))}
         </div>
         <nav aria-label="Чаты" className="conversation-list">
           {loading ? (
@@ -798,30 +867,29 @@ export default function Chat({ userId }: { userId: string }) {
               </div>
             )}
         </nav>
-        <footer className="sidebar-profile">
-          <button
-            className="profile-button"
-            onClick={() => setModal("settings")}
-          >
-            <Avatar
-              name={profile?.display_name || "A"}
-              path={profile?.avatar_path}
-            />
-            <span>
-              <strong>{profile?.display_name || "Профиль"}</strong>
-              <small>@{profile?.username}</small>
-            </span>
-          </button>
-          <button
-            className="icon-button"
-            aria-label="Настройки"
-            onClick={() => setModal("settings")}
-          >
-            <Settings size={19} />
-          </button>
-        </footer>
+        <button
+          className="compose-fab"
+          aria-label="Новый чат"
+          title="Новый чат"
+          onClick={() => {
+            setModal("new");
+            setFound(null);
+            setSearch("");
+            setGroupPeople([]);
+            setGroupTitle("");
+          }}
+        >
+          <PenLine size={23} />
+        </button>
       </aside>
       <section className="chat-main">
+        <div
+          className="chat-wallpaper"
+          aria-hidden="true"
+          style={{
+            backgroundImage: `url("${process.env.NEXT_PUBLIC_BASE_PATH || ""}/chat-pattern.svg")`,
+          }}
+        />
         {error && (
           <div className="global-alert" role="alert">
             <span>{error}</span>
@@ -844,15 +912,11 @@ export default function Chat({ userId }: { userId: string }) {
         {!current ? (
           <div className="chat-welcome">
             <div className="welcome-symbol">
-              <MessageCircle size={38} strokeWidth={1.4} aria-hidden="true" />
+              <Brand compact />
             </div>
             <h2>Выберите чат</h2>
-            <p>
-              Найдите собеседника по юзернейму
-              <br />
-              или создайте группу.
-            </p>
-            <button className="primary" onClick={() => setModal("new")}>
+            <p>Начните разговор по юзернейму.</p>
+            <button className="text-button" onClick={() => setModal("new")}>
               <Plus size={16} />
               Новый чат
             </button>
@@ -1695,7 +1759,20 @@ function ModalFrame({
     document.addEventListener("keydown", key);
     return () => {
       document.removeEventListener("keydown", key);
-      previous?.focus();
+      // Disclosure actions become hidden after opening a dialog; return to their summary.
+      const fallback =
+        previous?.closest("details")?.querySelector<HTMLElement>("summary") ||
+        document.querySelector<HTMLElement>(".app-menu > summary");
+      const disclosure = previous?.closest("details");
+      if (disclosure && !disclosure.open) fallback?.focus();
+      else if (
+        previous &&
+        previous !== document.body &&
+        previous.isConnected &&
+        previous.getClientRects().length
+      )
+        previous.focus();
+      else fallback?.focus();
     };
   }, [onClose]);
   return (
