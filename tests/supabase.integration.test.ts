@@ -3,11 +3,13 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 const url = process.env.TEST_SUPABASE_URL,
   key = process.env.TEST_SUPABASE_ANON_KEY,
   service = process.env.TEST_SUPABASE_SERVICE_ROLE_KEY;
-// Explicit opt-in: runs only against a dedicated test project, never a production project.
+// Dedicated project preferred. Testing the connected project requires explicit
+// TEST_SUPABASE_ALLOW_PROJECT, creates only temporary users, and cleans up their data.
 describe.skipIf(!url || !key || !service)(
   "real Supabase: auth, two users, RLS and Storage",
   () => {
     let admin: SupabaseClient;
+    const objects: string[] = [];
     const users: {
       id: string;
       client: SupabaseClient;
@@ -18,6 +20,13 @@ describe.skipIf(!url || !key || !service)(
     const suffix = crypto.randomUUID().replaceAll("-", "").slice(0, 12);
     const password = `Averiq-${crypto.randomUUID()}!`;
     beforeAll(async () => {
+      if (
+        new URL(url!).hostname === "vjahdisfhotedmexfrpk.supabase.co" &&
+        process.env.TEST_SUPABASE_ALLOW_PROJECT !== "vjahdisfhotedmexfrpk"
+      )
+        throw new Error(
+          "Explicit project acceptance authorization is required",
+        );
       admin = createClient(url!, service!, {
         auth: { persistSession: false, autoRefreshToken: false },
       });
@@ -34,18 +43,28 @@ describe.skipIf(!url || !key || !service)(
         const client = createClient(url!, key!, {
           auth: { persistSession: false, autoRefreshToken: false },
         });
+        users.push({ id: data.user.id, client, username, email });
         const login = await client.auth.signInWithPassword({ email, password });
         if (login.error) throw login.error;
-        users.push({ id: data.user.id, client, username, email });
       }
     }, 60000);
     afterAll(async () => {
-      for (const id of conversations)
-        await admin.from("conversations").delete().eq("id", id);
+      if (!admin) return;
+      const errors: string[] = [];
+      if (objects.length) {
+        const result = await admin.storage.from("attachments").remove(objects);
+        if (result.error) errors.push("storage cleanup failed");
+      }
+      for (const id of conversations) {
+        const result = await admin.from("conversations").delete().eq("id", id);
+        if (result.error) errors.push("conversation cleanup failed");
+      }
       for (const u of users) {
         await u.client.auth.signOut();
-        await admin.auth.admin.deleteUser(u.id);
+        const result = await admin.auth.admin.deleteUser(u.id);
+        if (result.error) errors.push("temporary account cleanup failed");
       }
+      if (errors.length) throw new Error(errors.join("; "));
     });
     it("authenticates distinct accounts and rejects incorrect password", async () => {
       expect(new Set(users.map((u) => u.id)).size).toBe(3);
@@ -57,32 +76,85 @@ describe.skipIf(!url || !key || !service)(
       });
       expect(bad.error).not.toBeNull();
     });
-    it("registers an unconfirmed account; confirms email before password login", async () => {
+    it("requires email confirmation before login", async () => {
       const client = createClient(url!, key!, {
-        auth: { persistSession: false },
+        auth: { persistSession: false, autoRefreshToken: false },
       });
-      const email = `averiq-signup-${suffix}@example.com`;
-      const username = `signup_${suffix}`;
-      const signup = await client.auth.signUp({
+      const username = `confirm_${suffix}`,
+        email = `averiq-confirm-${suffix}@example.com`;
+      const created = await admin.auth.admin.createUser({
         email,
         password,
-        options: { data: { username } },
+        email_confirm: false,
+        user_metadata: { username },
       });
-      expect(signup.error).toBeNull();
-      expect(signup.data.session).toBeNull();
-      const id = signup.data.user?.id;
-      expect(id).toBeTruthy();
-      if (!id) throw new Error("No signup user");
+      expect(created.error).toBeNull();
+      const id = created.data.user?.id;
+      if (!id) throw new Error("No temporary user");
       users.push({ id, client, username, email });
-      const before = await client.auth.signInWithPassword({ email, password });
-      expect(before.error).not.toBeNull();
-      const confirm = await admin.auth.admin.updateUserById(id, {
-        email_confirm: true,
-      });
-      expect(confirm.error).toBeNull();
-      const after = await client.auth.signInWithPassword({ email, password });
-      expect(after.error).toBeNull();
+      expect(
+        (await client.auth.signInWithPassword({ email, password })).error,
+      ).not.toBeNull();
+      expect(
+        (await admin.auth.admin.updateUserById(id, { email_confirm: true }))
+          .error,
+      ).toBeNull();
+      expect(
+        (await client.auth.signInWithPassword({ email, password })).error,
+      ).toBeNull();
     });
+    it.skipIf(!process.env.TEST_SIGNUP_EMAIL)(
+      "registers through the public Auth endpoint",
+      async () => {
+        const client = createClient(url!, key!, {
+          auth: { persistSession: false, autoRefreshToken: false },
+        });
+        const email = process.env.TEST_SIGNUP_EMAIL!,
+          username = `signup_${suffix}`;
+        // Never sign up or delete an address already belonging to a real account.
+        for (let page = 1; ; page++) {
+          const result = await admin.auth.admin.listUsers({
+            page,
+            perPage: 1000,
+          });
+          if (result.error)
+            throw new Error(
+              "Cannot establish that the signup test address is unused",
+            );
+          if (
+            result.data.users.some(
+              (user) => user.email?.toLowerCase() === email.toLowerCase(),
+            )
+          )
+            throw new Error(
+              "The controlled signup test address is already registered; use an unused address",
+            );
+          if (result.data.users.length < 1000) break;
+        }
+        const signup = await client.auth.signUp({
+          email,
+          password,
+          options: { data: { username } },
+        });
+        expect(signup.error).toBeNull();
+        expect(signup.data.session).toBeNull();
+        const id = signup.data.user?.id;
+        if (!id) throw new Error("No signup user");
+        const verified = await admin.auth.admin.getUserById(id);
+        if (
+          verified.error ||
+          verified.data.user.user_metadata.username !== username
+        )
+          throw new Error(
+            "Cannot establish ownership of the temporary signup account",
+          );
+        users.push({ id, client, username, email });
+        expect(
+          (await client.auth.signInWithPassword({ email, password })).error,
+        ).not.toBeNull();
+        // This verifies signup policy only. Mailbox delivery/callback is a separate signoff.
+      },
+    );
     it("enforces username uniqueness and hides emails and the user directory", async () => {
       const duplicate = await users[1].client
         .from("profiles")
@@ -107,11 +179,7 @@ describe.skipIf(!url || !key || !service)(
       const channel = b.client.channel(`chat:${cid}`, {
         config: { private: true },
       });
-      const received = new Promise<void>((resolve, reject) => {
-        const timeout = setTimeout(
-          () => reject(new Error("Realtime delivery timed out")),
-          15000,
-        );
+      const received = new Promise<void>((resolve) => {
         channel.on(
           "postgres_changes",
           {
@@ -120,26 +188,44 @@ describe.skipIf(!url || !key || !service)(
             table: "messages",
             filter: `conversation_id=eq.${cid}`,
           },
-          () => {
-            clearTimeout(timeout);
-            resolve();
-          },
+          () => resolve(),
         );
       });
-      await new Promise<void>((resolve, reject) => {
-        channel.subscribe((status) => {
-          if (status === "SUBSCRIBED") resolve();
-          if (status === "CHANNEL_ERROR" || status === "TIMED_OUT")
-            reject(new Error(status));
-        });
-      });
+      async function timeout<T>(
+        promise: Promise<T>,
+        ms: number,
+        label: string,
+      ): Promise<T> {
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        try {
+          return await Promise.race([
+            promise,
+            new Promise<never>((_resolve, reject) => {
+              timer = setTimeout(() => reject(new Error(label)), ms);
+            }),
+          ]);
+        } finally {
+          if (timer) clearTimeout(timer);
+        }
+      }
       try {
+        await timeout(
+          new Promise<void>((resolve, reject) => {
+            channel.subscribe((status) => {
+              if (status === "SUBSCRIBED") resolve();
+              if (status === "CHANNEL_ERROR" || status === "TIMED_OUT")
+                reject(new Error(status));
+            });
+          }),
+          15000,
+          "Realtime subscription timed out",
+        );
         const sent = await a.client.rpc("send_message", {
           cid,
           content: "Hello across accounts",
         });
         expect(sent.error).toBeNull();
-        await received;
+        await timeout(received, 15000, "Realtime message delivery timed out");
         const mid = sent.data;
         const history = await b.client
           .from("messages")
@@ -198,6 +284,7 @@ describe.skipIf(!url || !key || !service)(
             .data,
         ).toHaveLength(1);
         const path = `${cid}/${a.id}/${crypto.randomUUID()}.txt`;
+        objects.push(path);
         const upload = await a.client.storage
           .from("attachments")
           .upload(

@@ -1,6 +1,6 @@
 {
   "name": "averiqchat",
-  "version": "1.0.0",
+  "version": "0.1.0-beta.1",
   "description": "Averiq Chat \u2014 private real-time messaging with Supabase",
   "scripts": {
     "dev": "next dev",
@@ -12,7 +12,11 @@
     "test:e2e": "playwright test",
     "build:pages": "node scripts/build-pages.mjs",
     "test:pages": "playwright test -c playwright.pages.config.ts",
-    "test:chat": "playwright test -c playwright.chat.config.ts"
+    "test:chat": "playwright test -c playwright.chat.config.ts",
+    "release:check": "node scripts/check-release.mjs",
+    "smtp:check": "node scripts/configure-smtp.mjs",
+    "test:live": "node scripts/run-live-tests.mjs",
+    "release:publish": "node scripts/publish-release.mjs"
   },
   "repository": {
     "type": "git",

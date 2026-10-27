@@ -1,0 +1,28 @@
+name: Production availability
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/health.yml
+      - scripts/check-live-site.mjs
+      - scripts/check-live-backend.mjs
+      - config/supabase.public.json
+  schedule:
+    - cron: "17 * * * *"
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: availability
+  cancel-in-progress: false
+jobs:
+  health:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: node scripts/check-live-site.mjs
+      - run: node scripts/check-live-backend.mjs
