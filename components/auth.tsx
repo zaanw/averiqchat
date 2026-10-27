@@ -81,6 +81,17 @@ export default function Auth() {
           {light ? <Moon size={17} /> : <Sun size={17} />}
         </button>
       </header>
+      <aside className="auth-intro" aria-label="Об Averiq Chat">
+        <div className="auth-intro-content">
+          <h2>
+            Личные чаты.
+            <br />
+            <span>Группы и файлы.</span>
+          </h2>
+          <p>В браузере. На компьютере и телефоне.</p>
+        </div>
+        <small>© {new Date().getFullYear()} Averiq Chat</small>
+      </aside>
       <section className="auth-form-section">
         <form onSubmit={submit} className="auth-card">
           <h1>

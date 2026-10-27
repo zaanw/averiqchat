@@ -8,10 +8,11 @@ export default function Brand({ compact = false }: { compact?: boolean }) {
         fill="none"
         aria-hidden="true"
       >
+        <rect width="24" height="24" rx="7" fill="#8064c7" />
         <path
-          d="m4 19 8-15 8 15M7 14h10"
-          stroke="currentColor"
-          strokeWidth="1.6"
+          d="m5 18 7-13 7 13M8 13h8"
+          stroke="#fff"
+          strokeWidth="1.5"
           strokeLinecap="round"
           strokeLinejoin="round"
         />
