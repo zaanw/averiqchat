@@ -130,6 +130,7 @@ GitHub Pages размещает статический интерфейс; Supab
 
 1. Загрузите этот код в `zaanw/averiqchat`, ветку `main`.
 2. В репозитории откройте **Settings → Pages → Build and deployment → Source → GitHub Actions**. Для приватного репозитория доступность Pages зависит от тарифа GitHub.
+   Если workflow сообщает `Get Pages site failed: Not Found`, сначала проверьте этот выбор. У build-job должно быть `pages: read` (уже задано в workflow). Параметр `enablement: true` без отдельного токена администратора не создаёт сайт: стандартного `GITHUB_TOKEN` для первоначального включения недостаточно. Для ручного включения сайта дополнительный токен не нужен.
 3. В **Settings → Secrets and variables → Actions → Variables** добавьте две repository variables: `NEXT_PUBLIC_SUPABASE_URL` и `NEXT_PUBLIC_SUPABASE_ANON_KEY`. Это публичные настройки Supabase, не service role ключ. Без них сайт откроется с инструкцией подключения, но войти и переписываться будет нельзя.
 4. Примените SQL-миграцию и настройте Supabase по инструкции выше. Для стандартного project Pages задайте Site URL `https://zaanw.github.io/averiqchat/`, а redirect URL **точно с завершающим слешем**:
    - `https://zaanw.github.io/averiqchat/auth/confirm/`
