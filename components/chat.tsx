@@ -7,7 +7,6 @@ import {
   Check,
   CheckCheck,
   FileText,
-  Hash,
   ImagePlus,
   LoaderCircle,
   LogOut,
@@ -681,7 +680,6 @@ export default function Chat({ userId }: { userId: string }) {
             onChange={(e) => setFilter(e.target.value)}
           />
         </div>
-        <div className="list-label">ВАШИ РАЗГОВОРЫ</div>
         <nav aria-label="Чаты" className="conversation-list">
           {loading ? (
             <p className="muted loading-line">
@@ -807,21 +805,13 @@ export default function Chat({ userId }: { userId: string }) {
         )}
         {!current ? (
           <div className="chat-welcome">
-            <div className="welcome-symbol">
-              <MessageCircle size={42} />
-            </div>
-            <span className="eyebrow">ПРОСТРАНСТВО ДЛЯ СВОИХ</span>
-            <h2>Начните с «привет»</h2>
-            <p>
-              Найдите человека по юзернейму
-              <br />и начните ваш первый разговор.
-            </p>
-            <button className="primary" onClick={() => setModal("new")}>
-              <Plus size={18} /> Новый разговор
+            <MessageCircle size={30} strokeWidth={1.25} aria-hidden="true" />
+            <h2>Выберите чат</h2>
+            <p>Или найдите собеседника по юзернейму.</p>
+            <button className="text-button" onClick={() => setModal("new")}>
+              <Plus size={16} />
+              Новый чат
             </button>
-            <small>
-              <Hash size={13} /> Без публичного каталога пользователей
-            </small>
           </div>
         ) : (
           <>
@@ -1274,7 +1264,7 @@ export default function Chat({ userId }: { userId: string }) {
                 ? "Ваш профиль"
                 : modal === "group"
                   ? "О группе"
-                  : "Новый разговор"
+                  : "Новый чат"
             }
             onClose={closeModal}
           >

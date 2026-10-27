@@ -1,13 +1,6 @@
 "use client";
 import { useState } from "react";
-import {
-  ArrowRight,
-  ArrowLeft,
-  Mail,
-  LockKeyhole,
-  AtSign,
-  LoaderCircle,
-} from "lucide-react";
+import { ArrowLeft, LockKeyhole, LoaderCircle } from "lucide-react";
 import { getSupabase } from "../lib/supabase";
 import { passwordSchema, usernameSchema } from "../lib/validation";
 import Brand from "./brand";
@@ -67,128 +60,75 @@ export default function Auth() {
   }
   return (
     <main className="auth-page">
-      <section className="auth-story">
+      <header className="auth-header">
         <Brand />
-        <div className="story-content">
-          <span className="eyebrow">БЛИЖЕ, ДАЖЕ НА РАССТОЯНИИ</span>
-          <h1>
-            Хорошие разговоры
-            <br />
-            начинаются <em>здесь.</em>
-          </h1>
-          <p>
-            Ваши люди. Ваше пространство.
-            <br />
-            Ничего лишнего между вами.
-          </p>
-          <div className="orbit-art" aria-hidden="true">
-            <div className="orbit orbit-one" />
-            <div className="orbit orbit-two" />
-            <div className="orb orb-main">
-              <svg viewBox="0 0 80 80">
-                <path
-                  d="M18 20h44v31H39L25 64V51h-7Z"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="3"
-                  strokeLinejoin="round"
-                />
-                <circle cx="30" cy="35" r="2" />
-                <circle cx="40" cy="35" r="2" />
-                <circle cx="50" cy="35" r="2" />
-              </svg>
-            </div>
-            <span className="orb orb-small">✦</span>
-            <span className="orbit-dot" />
-          </div>
-        </div>
-        <span className="story-footer">Меньше шума. Больше смысла.</span>
-      </section>
+      </header>
       <section className="auth-form-section">
-        <div className="auth-mobile-brand">
-          <Brand />
-        </div>
         <form onSubmit={submit} className="auth-card">
-          <span className="eyebrow">ВАШЕ ЛИЧНОЕ ПРОСТРАНСТВО</span>
-          <h2>
+          <h1>
             {mode === "login"
-              ? "С возвращением"
+              ? "Вход"
               : mode === "signup"
-                ? "Давайте знакомиться"
-                : "Забыли пароль?"}
-          </h2>
+                ? "Регистрация"
+                : "Сброс пароля"}
+          </h1>
           <p className="muted">
             {mode === "login"
-              ? "Войдите, чтобы продолжить разговор."
+              ? "Войдите в Averiq Chat."
               : mode === "signup"
-                ? "Создайте аккаунт и найдите своих людей."
-                : "Пришлём ссылку для восстановления доступа."}
+                ? "Укажите email и выберите юзернейм."
+                : "Отправим ссылку на ваш email."}
           </p>
           {!client && (
             <div className="setup-notice">
               <strong>Подключите Supabase</strong>
               <p>
-                Для настоящей переписки нужны настройки сервера. Добавьте
-                NEXT_PUBLIC_SUPABASE_URL и NEXT_PUBLIC_SUPABASE_ANON_KEY в
-                .env.local по инструкции README.
+                Для входа нужен настроенный сервер. Инструкция подключения — в
+                README.
               </p>
-              <span>Демо-аккаунтов и вымышленных чатов здесь нет.</span>
             </div>
           )}
           <label>
             Email
-            <div className="input-icon">
-              <Mail size={18} />
-              <input
-                name="email"
-                type="email"
-                autoComplete="email"
-                placeholder="you@example.com"
-                required
-                maxLength={254}
-              />
-            </div>
+            <input
+              name="email"
+              type="email"
+              autoComplete="email"
+              placeholder="you@example.com"
+              required
+              maxLength={254}
+            />
           </label>
           {mode === "signup" && (
             <label>
               Юзернейм
-              <div className="input-icon">
-                <AtSign size={18} />
-                <input
-                  name="username"
-                  aria-label="Юзернейм"
-                  autoComplete="username"
-                  placeholder="your_name"
-                  required
-                  pattern="[A-Za-z][A-Za-z0-9_]{2,23}"
-                  minLength={3}
-                  maxLength={24}
-                />
-              </div>
-              <small>Латинские буквы, цифры и _, от 3 до 24 символов</small>
+              <input
+                name="username"
+                aria-label="Юзернейм"
+                autoComplete="username"
+                placeholder="username"
+                required
+                pattern="[A-Za-z][A-Za-z0-9_]{2,23}"
+                minLength={3}
+                maxLength={24}
+              />
+              <small>3–24 символа: латиница, цифры и _</small>
             </label>
           )}
           {mode !== "reset" && (
             <label>
               Пароль
-              <div className="input-icon">
-                <LockKeyhole size={18} />
-                <input
-                  name="password"
-                  type="password"
-                  autoComplete={
-                    mode === "signup" ? "new-password" : "current-password"
-                  }
-                  placeholder={
-                    mode === "signup"
-                      ? "Не менее 12 символов"
-                      : "Введите пароль"
-                  }
-                  required
-                  minLength={mode === "signup" ? 12 : 1}
-                  maxLength={128}
-                />
-              </div>
+              <input
+                name="password"
+                type="password"
+                autoComplete={
+                  mode === "signup" ? "new-password" : "current-password"
+                }
+                required
+                minLength={mode === "signup" ? 12 : 1}
+                maxLength={128}
+              />
+              {mode === "signup" && <small>Не менее 12 символов</small>}
             </label>
           )}
           {mode === "login" && (
@@ -216,33 +156,30 @@ export default function Auth() {
           )}
           <button className="primary auth-submit" disabled={busy || !client}>
             {busy ? (
-              <LoaderCircle className="spin" size={18} />
-            ) : (
               <>
-                {mode === "login"
-                  ? "Войти"
-                  : mode === "signup"
-                    ? "Создать аккаунт"
-                    : "Отправить ссылку"}
-                <ArrowRight size={18} />
+                <LoaderCircle className="spin" size={16} />
+                <span>Подождите…</span>
               </>
+            ) : mode === "login" ? (
+              "Войти"
+            ) : mode === "signup" ? (
+              "Создать аккаунт"
+            ) : (
+              "Отправить ссылку"
             )}
           </button>
           <div className="auth-switch">
             {mode === "login" ? (
-              <>
-                Ещё нет аккаунта?{" "}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMode("signup");
-                    setError("");
-                    setNotice("");
-                  }}
-                >
-                  Зарегистрироваться
-                </button>
-              </>
+              <button
+                type="button"
+                onClick={() => {
+                  setMode("signup");
+                  setError("");
+                  setNotice("");
+                }}
+              >
+                Зарегистрироваться
+              </button>
             ) : (
               <button
                 type="button"
@@ -252,22 +189,18 @@ export default function Auth() {
                   setNotice("");
                 }}
               >
-                <ArrowLeft size={14} /> Вернуться ко входу
+                <ArrowLeft size={14} />
+                Вернуться ко входу
               </button>
             )}
           </div>
-          <div className="privacy-note">
-            <LockKeyhole size={14} />
-            <span>
-              Личные чаты доступны только их участникам.
-              <br />
-              Сквозное шифрование не реализовано.
-            </span>
-          </div>
+          <details className="privacy-note">
+            <summary>
+              <LockKeyhole size={12} />О приватности
+            </summary>
+            <p>Личные чаты доступны их участникам. Сквозного шифрования нет.</p>
+          </details>
         </form>
-        <span className="auth-copyright">
-          © {new Date().getFullYear()} Averiq Chat
-        </span>
       </section>
     </main>
   );

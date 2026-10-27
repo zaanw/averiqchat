@@ -9,19 +9,17 @@ test("Pages export loads assets and nested auth routes under the repository path
       failures.push(`${response.status()} ${response.url()}`);
   });
   await page.goto("/averiqchat/");
-  await expect(
-    page.getByRole("heading", { name: "С возвращением" }),
-  ).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Вход" })).toBeVisible();
   expect(
     await page
       .locator("body")
       .evaluate((element) => getComputedStyle(element).backgroundColor),
-  ).toBe("rgb(13, 16, 27)");
+  ).toBe("rgb(17, 19, 21)");
   await page
     .getByRole("button", { name: "Зарегистрироваться", exact: true })
     .click();
   await expect(
-    page.getByRole("heading", { name: "Давайте знакомиться" }),
+    page.getByRole("heading", { name: "Регистрация" }),
   ).toBeVisible();
   await page.goto("/averiqchat/reset-password/");
   await expect(
@@ -32,8 +30,6 @@ test("Pages export loads assets and nested auth routes under the repository path
   await page.goto("/averiqchat/auth/confirm/");
   await expect(page.getByRole("status")).toContainText("подключите Supabase");
   await page.getByRole("link", { name: "На страницу входа" }).click();
-  await expect(
-    page.getByRole("heading", { name: "С возвращением" }),
-  ).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Вход" })).toBeVisible();
   expect(failures).toEqual([]);
 });
