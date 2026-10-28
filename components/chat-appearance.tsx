@@ -22,7 +22,7 @@ export default function ChatAppearance({
       <p className="settings-caption">
         {storageAvailable
           ? "Изменения сохраняются автоматически для вашего аккаунта в этом браузере."
-          : "Браузер не разрешает сохранять настройки. Изменения действуют до закрытия страницы."}
+          : "Браузер не разрешает сохранять настройки. Изменения действуют до перезагрузки страницы."}
       </p>
       <h3>Оформление</h3>
       <button
@@ -128,18 +128,21 @@ export default function ChatAppearance({
       </p>
       <label className="settings-row switch-row">
         <span>
-          Показывать, что я печатаю
-          <small>Собеседники видят индикатор набора</small>
+          Уменьшить анимации
+          <small>Без плавной прокрутки и анимаций переходов</small>
         </span>
         <input
           type="checkbox"
           role="switch"
-          checked={preferences.showTyping}
+          checked={preferences.reduceMotion}
           onChange={(event) =>
-            updatePreferences({ showTyping: event.target.checked })
+            updatePreferences({ reduceMotion: event.target.checked })
           }
         />
       </label>
+      <p className="settings-caption">
+        Индикатор набора и текст превью настраиваются в разделе «Приватность».
+      </p>
       <button
         className="text-button reset-preferences"
         onClick={resetPreferences}

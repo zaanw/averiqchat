@@ -41,6 +41,14 @@ test("chat filters, mobile navigation, grouped messages, composer and theme", as
       deleted_at: null,
     },
   ];
+  const privacySettings = { read_receipts: true, discoverable: true };
+  const blockedUsers = [
+    {
+      id: "00000000-0000-4000-8000-000000000099",
+      username: "blocked_friend",
+      display_name: "Заблокированный контакт",
+    },
+  ];
   const savedChat = "00000000-0000-4000-8000-000000000012";
   const savedMapping: { user_id: string; conversation_id: string }[] = [];
   const reactions: {
@@ -93,14 +101,12 @@ test("chat filters, mobile navigation, grouped messages, composer and theme", as
     ...Array.from({ length: 48 }, () => crypto.randomUUID()),
   ];
   members.push(
-    ...groupPeople
-      .slice(2)
-      .map((user_id) => ({
-        conversation_id: group,
-        user_id,
-        role: "member",
-        last_read_at: "2026-10-26T09:00:00Z",
-      })),
+    ...groupPeople.slice(2).map((user_id) => ({
+      conversation_id: group,
+      user_id,
+      role: "member",
+      last_read_at: "2026-10-26T09:00:00Z",
+    })),
   );
   const groupMessages = Array.from({ length: 11 }, (_, index) => ({
     ...messages[0],
@@ -172,7 +178,21 @@ test("chat filters, mobile navigation, grouped messages, composer and theme", as
         )
         .slice()
         .reverse();
-    else if (path.endsWith("/saved_conversations")) data = savedMapping;
+    else if (path.endsWith("/privacy_settings")) data = privacySettings;
+    else if (path.endsWith("/rpc/list_blocked_users")) data = blockedUsers;
+    else if (path.endsWith("/rpc/set_privacy_settings")) {
+      const payload = route.request().postDataJSON();
+      if (payload.share_read_receipts !== null)
+        privacySettings.read_receipts = payload.share_read_receipts;
+      if (payload.allow_discovery !== null)
+        privacySettings.discoverable = payload.allow_discovery;
+    } else if (path.endsWith("/rpc/set_block")) {
+      const payload = route.request().postDataJSON();
+      const index = blockedUsers.findIndex(
+        (user) => user.id === payload.peer_id,
+      );
+      if (!payload.blocked && index >= 0) blockedUsers.splice(index, 1);
+    } else if (path.endsWith("/saved_conversations")) data = savedMapping;
     else if (path.endsWith("/message_reactions")) {
       const cursor = url.searchParams
         .get("or")
@@ -458,6 +478,24 @@ test("chat filters, mobile navigation, grouped messages, composer and theme", as
   await page.getByRole("button", { name: "Настройки", exact: true }).click();
   await page
     .getByRole("dialog")
+    .getByLabel("Юзернейм", { exact: true })
+    .fill("bad-name");
+  await page
+    .getByRole("button", { name: "Сохранить профиль", exact: true })
+    .click();
+  await expect(page.getByRole("dialog").getByRole("alert")).toBeVisible();
+  await page
+    .getByRole("dialog")
+    .getByLabel("Юзернейм", { exact: true })
+    .fill("tester");
+  await page
+    .getByRole("button", { name: "Сохранить профиль", exact: true })
+    .click();
+  await expect(page.getByRole("dialog").getByRole("status")).toHaveText(
+    "Профиль сохранён",
+  );
+  await page
+    .getByRole("dialog")
     .getByRole("button", { name: "Чаты", exact: true })
     .click();
   await page.getByRole("button", { name: "Светлая тема", exact: true }).click();
@@ -469,9 +507,52 @@ test("chat filters, mobile navigation, grouped messages, composer and theme", as
   await page.getByLabel("Фон переписки").selectOption("plain");
   await page.getByRole("switch", { name: /Компактный список/ }).check();
   await page.getByLabel("Отправка сообщения").selectOption("mod-enter");
+  await page.getByRole("switch", { name: /Уменьшить анимации/ }).check();
+  await expect(page.locator(".chat-app")).toHaveAttribute(
+    "data-motion",
+    "reduced",
+  );
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: "Приватность", exact: true })
+    .click();
+  await expect(
+    page.getByRole("switch", { name: /Поиск по юзернейму/ }),
+  ).toBeChecked();
+  privacySettings.read_receipts = false;
+  await page.getByRole("switch", { name: /Поиск по юзернейму/ }).uncheck();
+  await expect(
+    page.getByRole("switch", { name: /Поиск по юзернейму/ }),
+  ).not.toBeChecked();
+  await expect(
+    page.getByRole("switch", { name: /Отчёты о прочтении/ }),
+  ).toBeEnabled();
+  expect(privacySettings.read_receipts).toBe(false);
+  await page.getByRole("switch", { name: /Отчёты о прочтении/ }).uncheck();
+  await expect(
+    page.getByRole("switch", { name: /Отчёты о прочтении/ }),
+  ).not.toBeChecked();
+  await page
+    .getByRole("switch", { name: /Текст сообщений в списке чатов/ })
+    .uncheck();
+  await expect(page.locator(".conversation-info > span").first()).toHaveText(
+    "",
+  );
+  await page
+    .getByRole("button", { name: /Разблокировать @blocked_friend/ })
+    .click();
+  await expect(page.locator(".blocked-user")).toHaveCount(0);
   await page
     .getByRole("switch", { name: /Показывать, что я печатаю/ })
     .uncheck();
+  await page.screenshot({
+    path: info.outputPath("privacy.png"),
+    animations: "disabled",
+  });
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: "Чаты", exact: true })
+    .click();
   await expect(page.locator(".chat-app")).toHaveAttribute(
     "data-accent",
     "violet",
@@ -552,9 +633,23 @@ test("chat filters, mobile navigation, grouped messages, composer and theme", as
     .getByRole("dialog")
     .getByRole("button", { name: "Чаты", exact: true })
     .click();
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: "Приватность", exact: true })
+    .click();
   await expect(
     page.getByRole("switch", { name: /Показывать, что я печатаю/ }),
   ).not.toBeChecked();
+  await expect(
+    page.getByRole("switch", { name: /Отчёты о прочтении/ }),
+  ).not.toBeChecked();
+  await expect(
+    page.getByRole("switch", { name: /Поиск по юзернейму/ }),
+  ).not.toBeChecked();
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: "Чаты", exact: true })
+    .click();
   await page
     .getByRole("button", { name: "Сбросить настройки чатов", exact: true })
     .click();
@@ -563,9 +658,23 @@ test("chat filters, mobile navigation, grouped messages, composer and theme", as
     "blue",
   );
   await expect(page.getByRole("slider")).toHaveValue("15");
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: "Приватность", exact: true })
+    .click();
+  await expect(
+    page.getByRole("switch", { name: /Показывать, что я печатаю/ }),
+  ).not.toBeChecked();
+  await expect(
+    page.getByRole("switch", { name: /Текст сообщений в списке чатов/ }),
+  ).not.toBeChecked();
+
   await page.keyboard.press("Escape");
   await page.getByLabel("Меню Averiq").click();
-  await page.getByRole("button", { name: "Избранное", exact: true }).click();
+  await page
+    .locator(".app-menu")
+    .getByRole("button", { name: "Избранное", exact: true })
+    .click();
   await expect(
     page.getByRole("heading", { name: "Избранное", exact: true }),
   ).toBeVisible();
@@ -579,7 +688,10 @@ test("chat filters, mobile navigation, grouped messages, composer and theme", as
   if (info.project.name === "mobile")
     await page.getByRole("button", { name: "Назад к чатам" }).click();
   await page.getByLabel("Меню Averiq").click();
-  await page.getByRole("button", { name: "Избранное", exact: true }).click();
+  await page
+    .locator(".app-menu")
+    .getByRole("button", { name: "Избранное", exact: true })
+    .click();
   await expect(page.getByRole("log")).toContainText("Моя личная заметка");
   expect(savedMapping).toHaveLength(1);
   await page

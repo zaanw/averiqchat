@@ -2151,3 +2151,76 @@ svg {
 .reaction-choices button[aria-pressed="true"] {
   background: var(--accent-tint);
 }
+.chat-app[data-motion="reduced"] *,
+.chat-app[data-motion="reduced"] *:before,
+.chat-app[data-motion="reduced"] *:after {
+  animation: none !important;
+  transition: none !important;
+  scroll-behavior: auto !important;
+}
+.modal:has(.settings-sections) {
+  max-width: 600px;
+}
+.settings-sections button {
+  white-space: nowrap;
+  padding-inline: 8px;
+}
+.settings-count {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 400;
+  margin-left: auto;
+}
+.blocked-user {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--line);
+}
+.blocked-user > span {
+  min-width: 0;
+}
+.blocked-user strong {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 14px;
+  font-weight: 500;
+}
+.blocked-user small {
+  display: block;
+  color: var(--muted);
+  margin-top: 4px;
+}
+.blocked-user button {
+  font-size: 12px;
+}
+.settings-error {
+  color: var(--danger);
+  font-size: 13px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.settings-error p {
+  margin-bottom: 6px;
+}
+@media (max-width: 700px) {
+  .settings-sections {
+    overflow-x: auto;
+    scrollbar-width: thin;
+  }
+  .settings-sections button {
+    font-size: 12px;
+  }
+}
+
+.settings-feedback {
+  font-size: 13px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--panel-soft);
+}

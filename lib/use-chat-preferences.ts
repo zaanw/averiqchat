@@ -65,7 +65,11 @@ export function useChatPreferences(userId: string) {
     [key],
   );
   const resetPreferences = useCallback(() => {
-    updatePreferences(DEFAULT_CHAT_PREFERENCES);
+    updatePreferences({
+      ...DEFAULT_CHAT_PREFERENCES,
+      showTyping: current.current.showTyping,
+      showPreviews: current.current.showPreviews,
+    });
   }, [updatePreferences]);
   return { preferences, updatePreferences, resetPreferences, storageAvailable };
 }

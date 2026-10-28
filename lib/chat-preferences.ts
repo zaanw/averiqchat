@@ -5,6 +5,8 @@ export const chatPreferencesSchema = z.object({
   fontSize: z.number().int().min(13).max(20).default(15),
   wallpaper: z.enum(["pattern", "plain"]).default("pattern"),
   compact: z.boolean().default(false),
+  reduceMotion: z.boolean().default(false),
+  showPreviews: z.boolean().default(true),
   sendShortcut: z.enum(["enter", "mod-enter"]).default("enter"),
   showTyping: z.boolean().default(true),
 });

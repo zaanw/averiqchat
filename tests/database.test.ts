@@ -60,6 +60,15 @@ describe("PostgreSQL migration and authorization", () => {
         "utf8",
       ),
     );
+    await db.exec(
+      readFileSync(
+        new URL(
+          "../supabase/migrations/202610280002_privacy_settings.sql",
+          import.meta.url,
+        ),
+        "utf8",
+      ),
+    );
     for (let i = 0; i < 3; i++)
       await db.query(
         "insert into auth.users(id,raw_user_meta_data) values($1,$2)",
@@ -616,6 +625,82 @@ describe("PostgreSQL migration and authorization", () => {
     await expect(
       db.query("select public.set_message_reaction($1,'👍')", [message]),
     ).rejects.toThrow(/недоступно/);
+  });
+  it("enforces account privacy for discovery and read receipts", async () => {
+    await as(0);
+    await db.query("select public.set_privacy_settings(false,false)");
+    await db.query("select public.set_privacy_settings(true,null)");
+    expect(
+      (
+        await db.query(
+          "select read_receipts,discoverable from public.privacy_settings",
+        )
+      ).rows,
+    ).toEqual([{ read_receipts: true, discoverable: false }]);
+    await db.query("select public.set_privacy_settings(false,null)");
+    const before = (
+      await db.query<{ last_read_at: string }>(
+        "select last_read_at from public.conversation_members where conversation_id=$1 and user_id=$2",
+        [cid, ids[0]],
+      )
+    ).rows[0].last_read_at;
+    await db.query("select public.mark_read($1)", [cid]);
+    expect(
+      (
+        await db.query<{ last_read_at: string }>(
+          "select last_read_at from public.conversation_members where conversation_id=$1 and user_id=$2",
+          [cid, ids[0]],
+        )
+      ).rows[0].last_read_at,
+    ).toEqual(before);
+    await as(2);
+    expect(
+      (await db.query("select * from public.find_user('tester_0')")).rows,
+    ).toHaveLength(0);
+    expect(
+      (await db.query("select * from public.privacy_settings")).rows,
+    ).toHaveLength(0);
+    await expect(
+      db.query(
+        "update public.privacy_settings set discoverable=true where user_id=$1",
+        [ids[0]],
+      ),
+    ).rejects.toThrow(/permission denied/);
+    await as(1);
+    expect(
+      (await db.query("select * from public.find_user('tester_0')")).rows,
+    ).toHaveLength(1);
+    await as(0);
+    await db.query("select public.set_privacy_settings(true,true)");
+    await db.query("select public.mark_read($1)", [cid]);
+    expect(
+      (
+        await db.query<{ last_read_at: string }>(
+          "select last_read_at from public.conversation_members where conversation_id=$1 and user_id=$2",
+          [cid, ids[0]],
+        )
+      ).rows[0].last_read_at,
+    ).not.toEqual(before);
+  });
+  it("lists only my blocked accounts and removes unblocked accounts", async () => {
+    await as(0);
+    await db.query("select public.set_block($1,true)", [ids[2]]);
+    expect(
+      (await db.query("select * from public.list_blocked_users()")).rows,
+    ).toEqual([{ id: ids[2], username: "tester_2", display_name: "Tester 2" }]);
+    expect(
+      (await db.query("select * from public.list_blocked_users('tester_2')"))
+        .rows,
+    ).toHaveLength(0);
+    await as(1);
+    expect(
+      (await db.query("select * from public.list_blocked_users()")).rows,
+    ).toHaveLength(0);
+    await as(0);
+    await db.query("select public.set_block($1,false)", [ids[2]]);
+    expect(
+      (await db.query("select * from public.list_blocked_users()")).rows,
+    ).toHaveLength(0);
   });
   it("throttles persisted sends server-side", async () => {
     await as(0);

@@ -63,14 +63,15 @@ assert.ok(
   [401, 403].includes(search.status),
   "Message search RPC must exist and reject anonymous access",
 );
-for (const table of ["saved_conversations", "message_reactions"]) {
-  const response = await fetch(
-    `${url}/rest/v1/${table}?select=conversation_id&limit=1`,
-    {
-      headers: { apikey: key },
-      signal: AbortSignal.timeout(30000),
-    },
-  );
+for (const table of [
+  "saved_conversations",
+  "message_reactions",
+  "privacy_settings",
+]) {
+  const response = await fetch(`${url}/rest/v1/${table}?select=*&limit=1`, {
+    headers: { apikey: key },
+    signal: AbortSignal.timeout(30000),
+  });
   assert.ok(
     [401, 403].includes(response.status),
     `${table} must exist and reject anonymous access`,

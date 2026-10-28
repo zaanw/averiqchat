@@ -59,6 +59,7 @@ import { useChatPreferences } from "../lib/use-chat-preferences";
 import ChatAppearance from "./chat-appearance";
 import MessageSearch from "./message-search";
 import MessageReactions from "./message-reactions";
+import ChatPrivacy from "./chat-privacy";
 
 function Avatar({
   name,
@@ -204,7 +205,7 @@ export default function Chat({ userId }: { userId: string }) {
   const { preferences, updatePreferences, resetPreferences, storageAvailable } =
     useChatPreferences(userId);
   const [settingsSection, setSettingsSection] = useState<
-    "profile" | "appearance" | "security"
+    "profile" | "appearance" | "privacy" | "security"
   >("profile");
   const [menu, setMenu] = useState(false);
   const [attachmentPending, setAttachmentPending] = useState(false);
@@ -615,8 +616,14 @@ export default function Chat({ userId }: { userId: string }) {
   }, []);
   const newestMessageId = messages.at(-1)?.id;
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [newestMessageId]);
+    bottomRef.current?.scrollIntoView({
+      behavior:
+        preferences.reduceMotion ||
+        window.matchMedia("(prefers-reduced-motion: reduce)").matches
+          ? "instant"
+          : "smooth",
+    });
+  }, [newestMessageId, preferences.reduceMotion]);
   async function run(action: () => Promise<void>) {
     setBusy(true);
     setError("");
@@ -808,6 +815,7 @@ export default function Chat({ userId }: { userId: string }) {
       data-accent={preferences.accent}
       data-compact={preferences.compact}
       data-wallpaper={preferences.wallpaper}
+      data-motion={preferences.reduceMotion ? "reduced" : "full"}
       style={
         { "--message-font-size": `${preferences.fontSize}px` } as CSSProperties
       }
@@ -867,7 +875,13 @@ export default function Chat({ userId }: { userId: string }) {
                 <Bookmark size={19} />
                 Избранное
               </button>
-              <button onClick={() => setModal("settings")}>
+              <button
+                onClick={() => {
+                  setError("");
+                  setNotice("");
+                  setModal("settings");
+                }}
+              >
                 <Settings size={19} />
                 Настройки
               </button>
@@ -983,15 +997,17 @@ export default function Chat({ userId }: { userId: string }) {
                   <span className="conversation-info">
                     <strong>{nameOf(c)}</strong>
                     <span>
-                      {last
-                        ? last.deleted_at
-                          ? "Сообщение удалено"
-                          : last.body || "Вложение"
-                        : c.id === savedId
-                          ? "Личные заметки и файлы"
-                          : c.kind === "group"
-                            ? "Новая группа"
-                            : "Начните разговор"}
+                      {!preferences.showPreviews
+                        ? ""
+                        : last
+                          ? last.deleted_at
+                            ? "Сообщение удалено"
+                            : last.body || "Вложение"
+                          : c.id === savedId
+                            ? "Личные заметки и файлы"
+                            : c.kind === "group"
+                              ? "Новая группа"
+                              : "Начните разговор"}
                     </span>
                   </span>
                   <span className="conversation-meta">
@@ -1328,7 +1344,13 @@ export default function Chat({ userId }: { userId: string }) {
                               );
                               if (el)
                                 el.scrollIntoView({
-                                  behavior: "smooth",
+                                  behavior:
+                                    preferences.reduceMotion ||
+                                    window.matchMedia(
+                                      "(prefers-reduced-motion: reduce)",
+                                    ).matches
+                                      ? "instant"
+                                      : "smooth",
                                   block: "center",
                                 });
                               else
@@ -1678,18 +1700,33 @@ export default function Chat({ userId }: { userId: string }) {
                     [
                       { value: "profile", label: "Профиль" },
                       { value: "appearance", label: "Чаты" },
+                      { value: "privacy", label: "Приватность" },
                       { value: "security", label: "Безопасность" },
                     ] as const
                   ).map((section) => (
                     <button
                       key={section.value}
                       aria-pressed={settingsSection === section.value}
-                      onClick={() => setSettingsSection(section.value)}
+                      onClick={() => {
+                        setSettingsSection(section.value);
+                        setError("");
+                        setNotice("");
+                      }}
                     >
                       {section.label}
                     </button>
                   ))}
                 </div>
+                {error && (
+                  <p className="settings-feedback error" role="alert">
+                    {error}
+                  </p>
+                )}
+                {notice && (
+                  <p className="settings-feedback success" role="status">
+                    {notice}
+                  </p>
+                )}
                 {settingsSection === "profile" && (
                   <div className="settings-section">
                     <div className="settings-avatar">
@@ -1744,6 +1781,15 @@ export default function Chat({ userId }: { userId: string }) {
                     resetPreferences={resetPreferences}
                     light={light}
                     toggleTheme={toggleTheme}
+                    storageAvailable={storageAvailable}
+                  />
+                )}
+                {settingsSection === "privacy" && (
+                  <ChatPrivacy
+                    userId={userId}
+                    preferences={preferences}
+                    updatePreferences={updatePreferences}
+                    onBlocksChanged={refresh}
                     storageAvailable={storageAvailable}
                   />
                 )}
@@ -2052,12 +2098,12 @@ export default function Chat({ userId }: { userId: string }) {
                 )}
               </>
             )}
-            {error && (
+            {modal !== "settings" && error && (
               <p role="alert" className="error">
                 {error}
               </p>
             )}
-            {notice && (
+            {modal !== "settings" && notice && (
               <p role="status" className="success">
                 {notice}
               </p>
