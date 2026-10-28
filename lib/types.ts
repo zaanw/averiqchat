@@ -44,3 +44,10 @@ export type ConversationPreference = {
   pinned: boolean;
   folder: string | null;
 };
+
+export type MessageReaction = {
+  message_id: string;
+  conversation_id: string;
+  user_id: string;
+  emoji: string;
+};

@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import type { Conversation, Message } from "../lib/types";
 import configuration from "../config/supabase.public.json" with { type: "json" };
 // Test-only service fixtures: never included in the product or sent to Supabase.
 // These checks validate UI behavior, not real authentication or message delivery.
@@ -40,6 +41,14 @@ test("chat filters, mobile navigation, grouped messages, composer and theme", as
       deleted_at: null,
     },
   ];
+  const savedChat = "00000000-0000-4000-8000-000000000012";
+  const savedMapping: { user_id: string; conversation_id: string }[] = [];
+  const reactions: {
+    message_id: string;
+    conversation_id: string;
+    user_id: string;
+    emoji: string;
+  }[] = [];
   const organization: {
     user_id: string;
     conversation_id: string;
@@ -52,7 +61,7 @@ test("chat filters, mobile navigation, grouped messages, composer and theme", as
     body: "Документ за прошлый год",
     created_at: "2025-01-01T10:00:00Z",
   };
-  const conversations = [
+  const conversations: (Conversation & { last_message: Message | null })[] = [
     {
       id: direct,
       kind: "direct",
@@ -130,7 +139,49 @@ test("chat filters, mobile navigation, grouped messages, composer and theme", as
         )
         .slice()
         .reverse();
-    else if (path.endsWith("/conversation_preferences")) data = organization;
+    else if (path.endsWith("/saved_conversations")) data = savedMapping;
+    else if (path.endsWith("/message_reactions"))
+      data = reactions.filter(
+        (item) =>
+          `eq.${item.conversation_id}` ===
+          url.searchParams.get("conversation_id"),
+      );
+    else if (path.endsWith("/rpc/set_message_reaction")) {
+      const payload = route.request().postDataJSON();
+      const index = reactions.findIndex(
+        (item) => item.message_id === payload.mid && item.user_id === me,
+      );
+      if (index >= 0) reactions.splice(index, 1);
+      if (payload.reaction)
+        reactions.push({
+          message_id: payload.mid,
+          conversation_id: messages.find(
+            (message) => message.id === payload.mid,
+          )!.conversation_id,
+          user_id: me,
+          emoji: payload.reaction,
+        });
+      data = null;
+    } else if (path.endsWith("/rpc/open_saved_messages")) {
+      if (!savedMapping.length) {
+        savedMapping.push({ user_id: me, conversation_id: savedChat });
+        conversations.push({
+          id: savedChat,
+          kind: "direct",
+          title: null,
+          avatar_path: null,
+          created_at: "2026-10-28T08:00:00Z",
+          last_message: null,
+        });
+        members.push({
+          conversation_id: savedChat,
+          user_id: me,
+          role: "member",
+          last_read_at: "2026-10-28T08:00:00Z",
+        });
+      }
+      data = savedChat;
+    } else if (path.endsWith("/conversation_preferences")) data = organization;
     else if (path.endsWith("/rpc/set_chat_preferences")) {
       const payload = route.request().postDataJSON();
       let preference = organization.find(
@@ -293,6 +344,34 @@ test("chat filters, mobile navigation, grouped messages, composer and theme", as
     page.getByRole("button", { name: "Поиск сообщений", exact: true }),
   ).toBeFocused();
   await expect(page.locator(".message-row.grouped")).toHaveCount(1);
+  const reactionTarget = page.locator(".message-row").first();
+  await reactionTarget
+    .getByRole("button", { name: "Добавить реакцию", exact: true })
+    .click();
+  await reactionTarget
+    .getByRole("button", { name: "Поставить 👍", exact: true })
+    .click();
+  await expect(
+    reactionTarget.getByRole("button", { name: "Реакция 👍: 1", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await reactionTarget
+    .getByRole("button", { name: "Добавить реакцию", exact: true })
+    .click();
+  await reactionTarget
+    .getByRole("button", { name: "Поставить ❤️", exact: true })
+    .click();
+  await expect(
+    reactionTarget.getByRole("button", { name: "Реакция ❤️: 1", exact: true }),
+  ).toBeVisible();
+  await expect(
+    reactionTarget.getByRole("button", { name: "Реакция 👍: 1", exact: true }),
+  ).toHaveCount(0);
+  await reactionTarget
+    .getByRole("button", { name: "Реакция ❤️: 1", exact: true })
+    .click();
+  await expect(
+    reactionTarget.getByRole("button", { name: "Реакция ❤️: 1", exact: true }),
+  ).toHaveCount(0);
   const firstMessage = page.locator(".message-row").first();
   await firstMessage.getByLabel("Действия с сообщением").click();
   await firstMessage
@@ -434,6 +513,38 @@ test("chat filters, mobile navigation, grouped messages, composer and theme", as
   );
   await expect(page.getByRole("slider")).toHaveValue("15");
   await page.keyboard.press("Escape");
+  await page.getByLabel("Меню Averiq").click();
+  await page.getByRole("button", { name: "Избранное", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "Избранное", exact: true }),
+  ).toBeVisible();
+  await page
+    .getByRole("textbox", { name: "Сообщение", exact: true })
+    .fill("Моя личная заметка");
+  await page
+    .getByRole("button", { name: "Отправить сообщение", exact: true })
+    .click();
+  await expect(page.getByRole("log")).toContainText("Моя личная заметка");
+  if (info.project.name === "mobile")
+    await page.getByRole("button", { name: "Назад к чатам" }).click();
+  await page.getByLabel("Меню Averiq").click();
+  await page.getByRole("button", { name: "Избранное", exact: true }).click();
+  await expect(page.getByRole("log")).toContainText("Моя личная заметка");
+  expect(savedMapping).toHaveLength(1);
+  await page
+    .getByRole("button", { name: "Действия с чатом", exact: true })
+    .click();
+  await expect(
+    page.getByRole("button", { name: "Заблокировать", exact: true }),
+  ).toHaveCount(0);
+  await page
+    .getByRole("button", { name: "Действия с чатом", exact: true })
+    .click();
+  await page.screenshot({
+    path: info.outputPath("saved.png"),
+    animations: "disabled",
+  });
+  savedMapping.splice(0);
   conversations.splice(0);
   members.splice(0);
   messages.splice(0);

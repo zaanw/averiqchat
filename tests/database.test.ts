@@ -51,6 +51,15 @@ describe("PostgreSQL migration and authorization", () => {
         "utf8",
       ),
     );
+    await db.exec(
+      readFileSync(
+        new URL(
+          "../supabase/migrations/202610280001_saved_reactions.sql",
+          import.meta.url,
+        ),
+        "utf8",
+      ),
+    );
     for (let i = 0; i < 3; i++)
       await db.query(
         "insert into auth.users(id,raw_user_meta_data) values($1,$2)",
@@ -492,6 +501,121 @@ describe("PostgreSQL migration and authorization", () => {
     await expect(
       db.query("select public.search_messages($1,'test')", [groupId]),
     ).rejects.toThrow(/Нет доступа/);
+  });
+  it("creates one private saved conversation per account", async () => {
+    await as(0);
+    const saved = (
+      await db.query<{ id: string }>(
+        "select public.open_saved_messages() as id",
+      )
+    ).rows[0].id;
+    expect(
+      (await db.query("select public.open_saved_messages() as id")).rows,
+    ).toEqual([{ id: saved }]);
+    const note = (
+      await db.query<{ id: string }>(
+        "select public.send_message($1,'Private note') as id",
+        [saved],
+      )
+    ).rows[0].id;
+    expect(
+      (
+        await db.query(
+          "select * from public.conversation_members where conversation_id=$1",
+          [saved],
+        )
+      ).rows,
+    ).toHaveLength(1);
+    await as(1);
+    expect(
+      (await db.query("select * from public.saved_conversations")).rows,
+    ).toHaveLength(0);
+    expect(
+      (await db.query("select * from public.messages where id=$1", [note]))
+        .rows,
+    ).toHaveLength(0);
+    await expect(
+      db.query("select * from public.search_messages($1,'Private')", [saved]),
+    ).rejects.toThrow(/Нет доступа/);
+    await expect(
+      db.query("select public.invite_member($1,$2)", [saved, ids[1]]),
+    ).rejects.toThrow();
+    const ownSaved = (
+      await db.query<{ id: string }>(
+        "select public.open_saved_messages() as id",
+      )
+    ).rows[0].id;
+    expect(ownSaved).not.toBe(saved);
+  });
+  it("limits reactions to members, with one choice per person", async () => {
+    await as(0);
+    const message = (
+      await db.query<{ id: string }>(
+        "select public.send_message($1,'React to this') as id",
+        [cid],
+      )
+    ).rows[0].id;
+    await db.query("select public.set_message_reaction($1,'👍')", [message]);
+    await db.query("select public.set_message_reaction($1,'❤️')", [message]);
+    expect(
+      (
+        await db.query(
+          "select emoji from public.message_reactions where message_id=$1",
+          [message],
+        )
+      ).rows,
+    ).toEqual([{ emoji: "❤️" }]);
+    await as(1);
+    await db.query("select public.set_message_reaction($1,'❤️')", [message]);
+    expect(
+      (
+        await db.query(
+          "select emoji from public.message_reactions where message_id=$1",
+          [message],
+        )
+      ).rows,
+    ).toHaveLength(2);
+    await db.query("select public.set_message_reaction($1,null)", [message]);
+    expect(
+      (
+        await db.query(
+          "select user_id from public.message_reactions where message_id=$1",
+          [message],
+        )
+      ).rows,
+    ).toEqual([{ user_id: ids[0] }]);
+    await expect(
+      db.query("select public.set_message_reaction($1,'not-an-emoji')", [
+        message,
+      ]),
+    ).rejects.toThrow(/check constraint/);
+    await expect(
+      db.query("insert into public.message_reactions values($1,$2,$3,'👍')", [
+        message,
+        cid,
+        ids[0],
+      ]),
+    ).rejects.toThrow(/permission denied/);
+    await as(2);
+    expect(
+      (await db.query("select * from public.message_reactions")).rows,
+    ).toHaveLength(0);
+    await expect(
+      db.query("select public.set_message_reaction($1,'👍')", [message]),
+    ).rejects.toThrow(/недоступно/);
+    await as(0);
+    await db.query("select public.delete_message($1)", [message]);
+    expect(
+      (
+        await db.query(
+          "select * from public.message_reactions where message_id=$1",
+          [message],
+        )
+      ).rows,
+    ).toHaveLength(0);
+    await expect(
+      db.query("select public.set_message_reaction($1,'👍')", [message]),
+    ).rejects.toThrow(/недоступно/);
   });
   it("throttles persisted sends server-side", async () => {
     await as(0);

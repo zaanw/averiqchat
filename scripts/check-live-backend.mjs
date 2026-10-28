@@ -63,6 +63,29 @@ assert.ok(
   [401, 403].includes(search.status),
   "Message search RPC must exist and reject anonymous access",
 );
+for (const table of ["saved_conversations", "message_reactions"]) {
+  const response = await fetch(
+    `${url}/rest/v1/${table}?select=conversation_id&limit=1`,
+    {
+      headers: { apikey: key },
+      signal: AbortSignal.timeout(30000),
+    },
+  );
+  assert.ok(
+    [401, 403].includes(response.status),
+    `${table} must exist and reject anonymous access`,
+  );
+}
+const saved = await fetch(`${url}/rest/v1/rpc/open_saved_messages`, {
+  method: "POST",
+  headers: { apikey: key, "Content-Type": "application/json" },
+  body: "{}",
+  signal: AbortSignal.timeout(30000),
+});
+assert.ok(
+  [401, 403].includes(saved.status),
+  "Saved messages RPC must exist and reject anonymous access",
+);
 console.log(
-  "Live Supabase checks passed: Auth reachable, email confirmation enabled, anonymous profiles, personal preferences and message search denied. SMTP delivery and user-to-user messaging are not tested by this check.",
+  "Live Supabase checks passed: Auth reachable, email confirmation enabled, anonymous profiles, personal preferences, message search, saved notes and reactions denied. SMTP delivery and user-to-user messaging are not tested by this check.",
 );

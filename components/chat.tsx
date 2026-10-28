@@ -38,6 +38,7 @@ import {
   Pin,
   PinOff,
   Folder,
+  Bookmark,
 } from "lucide-react";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { getSupabase } from "../lib/supabase";
@@ -48,6 +49,7 @@ import type {
   Message,
   Profile,
   ConversationPreference,
+  MessageReaction,
 } from "../lib/types";
 import { messageSchema, usernameSchema, validateFile } from "../lib/validation";
 import Brand from "./brand";
@@ -56,6 +58,7 @@ import { useTheme } from "../lib/use-theme";
 import { useChatPreferences } from "../lib/use-chat-preferences";
 import ChatAppearance from "./chat-appearance";
 import MessageSearch from "./message-search";
+import MessageReactions from "./message-reactions";
 
 function Avatar({
   name,
@@ -98,6 +101,13 @@ function Avatar({
       }
     >
       {url ? <img src={url} alt="" /> : name.slice(0, 2).toUpperCase()}
+    </span>
+  );
+}
+function SavedAvatar() {
+  return (
+    <span className="avatar saved-avatar">
+      <Bookmark size={23} aria-hidden="true" />
     </span>
   );
 }
@@ -152,6 +162,8 @@ function FileView({ attachment }: { attachment: Attachment }) {
 export default function Chat({ userId }: { userId: string }) {
   const client = getSupabase()!;
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [savedId, setSavedId] = useState<string | null>(null);
+  const [reactions, setReactions] = useState<MessageReaction[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
@@ -227,17 +239,19 @@ export default function Chat({ userId }: { userId: string }) {
     currentMembers.find((m) => m.user_id === userId)?.role === "owner";
   const nameOf = useCallback(
     (c: Conversation) =>
-      c.kind === "group"
-        ? c.title || "Группа"
-        : profiles.find((p) =>
-            members.some(
-              (m) =>
-                m.conversation_id === c.id &&
-                m.user_id === p.id &&
-                p.id !== userId,
-            ),
-          )?.display_name || "Личный чат",
-    [profiles, members, userId],
+      c.id === savedId
+        ? "Избранное"
+        : c.kind === "group"
+          ? c.title || "Группа"
+          : profiles.find((p) =>
+              members.some(
+                (m) =>
+                  m.conversation_id === c.id &&
+                  m.user_id === p.id &&
+                  p.id !== userId,
+              ),
+            )?.display_name || "Личный чат",
+    [profiles, members, userId, savedId],
   );
   const folders = [
     ...new Set(
@@ -275,16 +289,21 @@ export default function Chat({ userId }: { userId: string }) {
         ),
     );
   const refresh = useCallback(async () => {
-    const [p, c, m, ps, b, cp] = await Promise.all([
+    const [p, c, m, ps, b, cp, saved] = await Promise.all([
       client.from("profiles").select("*").eq("id", userId).single(),
       client.rpc("list_conversations"),
       client.from("conversation_members").select("*"),
       client.from("profiles").select("*"),
       client.from("blocks").select("blocked_id"),
       client.from("conversation_preferences").select("*"),
+      client
+        .from("saved_conversations")
+        .select("conversation_id")
+        .eq("user_id", userId),
     ]);
-    for (const result of [p, c, m, ps, b, cp])
+    for (const result of [p, c, m, ps, b, cp, saved])
       if (result.error) throw result.error;
+    setSavedId(saved.data?.[0]?.conversation_id || null);
     setOrganization(cp.data || []);
     setProfile(p.data);
     setConversations(c.data || []);
@@ -309,6 +328,7 @@ export default function Chat({ userId }: { userId: string }) {
       setSelected(null);
       setMessages([]);
       setAttachments([]);
+      setReactions([]);
     }
   }, [client, userId]);
   const loadMessages = useCallback(
@@ -370,8 +390,9 @@ export default function Chat({ userId }: { userId: string }) {
             rows.push(...(updated.data || []));
           }
         }
-        const pageIds = rows.map((message) => message.id);
+        const pageIds = [...new Set(rows.map((message) => message.id))];
         const loadedFiles: Attachment[] = [];
+        const loadedReactions: MessageReaction[] = [];
         for (let offset = 0; offset < pageIds.length; offset += 100) {
           const result = await client
             .from("attachments")
@@ -380,6 +401,13 @@ export default function Chat({ userId }: { userId: string }) {
             .in("message_id", pageIds.slice(offset, offset + 100));
           if (result.error) throw result.error;
           loadedFiles.push(...(result.data || []));
+          const reactionRows = await client
+            .from("message_reactions")
+            .select("*")
+            .eq("conversation_id", cid)
+            .in("message_id", pageIds.slice(offset, offset + 100));
+          if (reactionRows.error) throw reactionRows.error;
+          loadedReactions.push(...(reactionRows.data || []));
         }
         if (activeRef.current !== cid) return;
         if (older || messages.length === 0)
@@ -393,6 +421,10 @@ export default function Chat({ userId }: { userId: string }) {
               a.id.localeCompare(b.id),
           );
         });
+        setReactions((previous) => [
+          ...previous.filter((item) => !pageIds.includes(item.message_id)),
+          ...loadedReactions,
+        ]);
         setAttachments((previous) => [
           ...previous.filter(
             (attachment) => !pageIds.includes(attachment.message_id || ""),
@@ -588,6 +620,7 @@ export default function Chat({ userId }: { userId: string }) {
     return data;
   }
   function select(id: string | null) {
+    if (activeRef.current === id) return;
     activeRef.current = id;
     setSelected(id);
     setTyping(false);
@@ -596,6 +629,7 @@ export default function Chat({ userId }: { userId: string }) {
     pendingMessage.current = null;
     setMessages([]);
     setAttachments([]);
+    setReactions([]);
     setDraft("");
     setReply(null);
     setEditing(null);
@@ -802,6 +836,22 @@ export default function Chat({ userId }: { userId: string }) {
                 <PenLine size={19} />
                 Новый чат
               </button>
+              <button
+                disabled={busy}
+                onClick={() =>
+                  void run(async () => {
+                    const cid = await rpc("open_saved_messages", {});
+                    await refresh();
+                    setFilter("");
+                    setFolderFilter("");
+                    setChatKind("all");
+                    select(cid);
+                  })
+                }
+              >
+                <Bookmark size={19} />
+                Избранное
+              </button>
               <button onClick={() => setModal("settings")}>
                 <Settings size={19} />
                 Настройки
@@ -904,13 +954,17 @@ export default function Chat({ userId }: { userId: string }) {
                   onClick={() => select(c.id)}
                   className={`conversation-item ${c.id === selected ? "active" : ""}`}
                 >
-                  <Avatar
-                    name={nameOf(c)}
-                    path={
-                      c.kind === "group" ? c.avatar_path : other?.avatar_path
-                    }
-                    bucket={c.kind === "group" ? "group-avatars" : "avatars"}
-                  />
+                  {c.id === savedId ? (
+                    <SavedAvatar />
+                  ) : (
+                    <Avatar
+                      name={nameOf(c)}
+                      path={
+                        c.kind === "group" ? c.avatar_path : other?.avatar_path
+                      }
+                      bucket={c.kind === "group" ? "group-avatars" : "avatars"}
+                    />
+                  )}
                   <span className="conversation-info">
                     <strong>{nameOf(c)}</strong>
                     <span>
@@ -918,9 +972,11 @@ export default function Chat({ userId }: { userId: string }) {
                         ? last.deleted_at
                           ? "Сообщение удалено"
                           : last.body || "Вложение"
-                        : c.kind === "group"
-                          ? "Новая группа"
-                          : "Начните разговор"}
+                        : c.id === savedId
+                          ? "Личные заметки и файлы"
+                          : c.kind === "group"
+                            ? "Новая группа"
+                            : "Начните разговор"}
                     </span>
                   </span>
                   <span className="conversation-meta">
@@ -1023,23 +1079,31 @@ export default function Chat({ userId }: { userId: string }) {
               >
                 <ArrowLeft size={20} />
               </button>
-              <Avatar
-                name={nameOf(current)}
-                path={
-                  current.kind === "group"
-                    ? current.avatar_path
-                    : peer?.avatar_path
-                }
-                bucket={current.kind === "group" ? "group-avatars" : "avatars"}
-              />
+              {current.id === savedId ? (
+                <SavedAvatar />
+              ) : (
+                <Avatar
+                  name={nameOf(current)}
+                  path={
+                    current.kind === "group"
+                      ? current.avatar_path
+                      : peer?.avatar_path
+                  }
+                  bucket={
+                    current.kind === "group" ? "group-avatars" : "avatars"
+                  }
+                />
+              )}
               <div className="chat-heading">
                 <h2>{nameOf(current)}</h2>
                 <span className={typing ? "accent-text" : ""}>
-                  {typing
-                    ? "печатает…"
-                    : current.kind === "group"
-                      ? `${currentMembers.length} участников`
-                      : `@${peer?.username || "…"}`}
+                  {current.id === savedId
+                    ? "Личные заметки и файлы"
+                    : typing
+                      ? "печатает…"
+                      : current.kind === "group"
+                        ? `${currentMembers.length} участников`
+                        : `@${peer?.username || "…"}`}
                 </span>
               </div>
               <span
@@ -1130,24 +1194,26 @@ export default function Chat({ userId }: { userId: string }) {
                         </button>
                       </>
                     ) : (
-                      <button
-                        onClick={() =>
-                          void run(async () => {
-                            if (!peerId) return;
-                            await rpc("set_block", {
-                              peer_id: peerId,
-                              blocked: !blocked.includes(peerId),
-                            });
-                            await refresh();
-                            setMenu(false);
-                          })
-                        }
-                      >
-                        <ShieldBan size={16} />
-                        {peerId && blocked.includes(peerId)
-                          ? "Разблокировать"
-                          : "Заблокировать"}
-                      </button>
+                      current.id !== savedId && (
+                        <button
+                          onClick={() =>
+                            void run(async () => {
+                              if (!peerId) return;
+                              await rpc("set_block", {
+                                peer_id: peerId,
+                                blocked: !blocked.includes(peerId),
+                              });
+                              await refresh();
+                              setMenu(false);
+                            })
+                          }
+                        >
+                          <ShieldBan size={16} />
+                          {peerId && blocked.includes(peerId)
+                            ? "Разблокировать"
+                            : "Заблокировать"}
+                        </button>
+                      )
                     )}
                   </div>
                 )}
@@ -1185,7 +1251,11 @@ export default function Chat({ userId }: { userId: string }) {
               {!messages.length && (
                 <div className="conversation-empty">
                   <span className="day-label">Начало разговора</span>
-                  <p>Пока тихо. Напишите первое сообщение.</p>
+                  <p>
+                    {current.id === savedId
+                      ? "Сохраняйте здесь свои заметки и файлы."
+                      : "Пока тихо. Напишите первое сообщение."}
+                  </p>
                 </div>
               )}
               {messages.map((m, i) => {
@@ -1279,6 +1349,7 @@ export default function Chat({ userId }: { userId: string }) {
                             })}
                           </time>
                           {mine &&
+                            current.id !== savedId &&
                             !m.deleted_at &&
                             (read ? (
                               <CheckCheck
@@ -1292,6 +1363,25 @@ export default function Chat({ userId }: { userId: string }) {
                               />
                             ))}
                         </div>
+                        {!m.deleted_at && (
+                          <MessageReactions
+                            items={reactions.filter(
+                              (item) => item.message_id === m.id,
+                            )}
+                            userId={userId}
+                            busy={busy || retryPending}
+                            onReact={(emoji) =>
+                              void run(async () => {
+                                await rpc("set_message_reaction", {
+                                  mid: m.id,
+                                  reaction: emoji,
+                                });
+                                if (activeRef.current === m.conversation_id)
+                                  await loaderRef.current(m.conversation_id);
+                              })
+                            }
+                          />
+                        )}
                       </div>
                       {!m.deleted_at && (
                         <details

@@ -2100,3 +2100,54 @@ svg {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.saved-avatar {
+  background: var(--action);
+  color: white;
+}
+.message-reactions {
+  margin-top: 5px;
+}
+.reaction-counts {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.reaction-counts > button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 7px;
+  background: var(--panel-soft);
+  border: 1px solid transparent;
+  border-radius: 14px;
+  font-size: 13px;
+}
+.reaction-counts > button[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: var(--accent-tint);
+}
+.reaction-counts span {
+  font-size: 11px;
+  color: var(--muted);
+}
+.reaction-counts > .add-reaction {
+  background: transparent;
+  color: var(--muted);
+  padding: 4px;
+}
+.reaction-choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  margin-top: 5px;
+}
+.reaction-choices button {
+  padding: 6px;
+  border-radius: 7px;
+  font-size: 18px;
+}
+.reaction-choices button:hover,
+.reaction-choices button[aria-pressed="true"] {
+  background: var(--accent-tint);
+}
