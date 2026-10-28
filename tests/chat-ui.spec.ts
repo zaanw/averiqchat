@@ -87,6 +87,39 @@ test("chat filters, mobile navigation, grouped messages, composer and theme", as
       last_read_at: "2026-10-27T09:00:00Z",
     })),
   );
+  const groupPeople = [
+    me,
+    peer,
+    ...Array.from({ length: 48 }, () => crypto.randomUUID()),
+  ];
+  members.push(
+    ...groupPeople
+      .slice(2)
+      .map((user_id) => ({
+        conversation_id: group,
+        user_id,
+        role: "member",
+        last_read_at: "2026-10-26T09:00:00Z",
+      })),
+  );
+  const groupMessages = Array.from({ length: 11 }, (_, index) => ({
+    ...messages[0],
+    id: crypto.randomUUID(),
+    conversation_id: group,
+    body: `Групповое сообщение ${index}`,
+    created_at: `2026-10-26T10:00:${String(index).padStart(2, "0")}Z`,
+  }));
+  messages.push(...groupMessages);
+  reactions.push(
+    ...groupMessages.flatMap((message) =>
+      groupPeople.map((user_id) => ({
+        message_id: message.id,
+        conversation_id: group,
+        user_id,
+        emoji: "👍",
+      })),
+    ),
+  );
   const now = Math.floor(Date.now() / 1000);
   const jwt = `e30.${Buffer.from(JSON.stringify({ sub: me, role: "authenticated", aud: "authenticated", exp: now + 3600, iat: now })).toString("base64url")}.test`;
   await page.addInitScript(
@@ -140,13 +173,28 @@ test("chat filters, mobile navigation, grouped messages, composer and theme", as
         .slice()
         .reverse();
     else if (path.endsWith("/saved_conversations")) data = savedMapping;
-    else if (path.endsWith("/message_reactions"))
-      data = reactions.filter(
-        (item) =>
-          `eq.${item.conversation_id}` ===
-          url.searchParams.get("conversation_id"),
-      );
-    else if (path.endsWith("/rpc/set_message_reaction")) {
+    else if (path.endsWith("/message_reactions")) {
+      const cursor = url.searchParams
+        .get("or")
+        ?.match(
+          /message_id\.gt\.([a-f0-9-]+),and\(message_id\.eq\.[a-f0-9-]+,user_id\.gt\.([a-f0-9-]+)\)/,
+        );
+      data = reactions
+        .filter(
+          (item) =>
+            `eq.${item.conversation_id}` ===
+              url.searchParams.get("conversation_id") &&
+            (!cursor ||
+              item.message_id > cursor[1] ||
+              (item.message_id === cursor[1] && item.user_id > cursor[2])),
+        )
+        .sort(
+          (a, b) =>
+            a.message_id.localeCompare(b.message_id) ||
+            a.user_id.localeCompare(b.user_id),
+        )
+        .slice(0, Number(url.searchParams.get("limit") || 1000));
+    } else if (path.endsWith("/rpc/set_message_reaction")) {
       const payload = route.request().postDataJSON();
       const index = reactions.findIndex(
         (item) => item.message_id === payload.mid && item.user_id === me,
@@ -257,6 +305,9 @@ test("chat filters, mobile navigation, grouped messages, composer and theme", as
     .locator(".conversation-item")
     .filter({ hasText: "Команда" })
     .click();
+  await expect(
+    page.getByRole("button", { name: "Реакция 👍: 50", exact: true }),
+  ).toHaveCount(11);
   await page
     .getByRole("button", { name: "Действия с чатом", exact: true })
     .click();

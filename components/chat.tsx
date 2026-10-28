@@ -401,13 +401,28 @@ export default function Chat({ userId }: { userId: string }) {
             .in("message_id", pageIds.slice(offset, offset + 100));
           if (result.error) throw result.error;
           loadedFiles.push(...(result.data || []));
-          const reactionRows = await client
-            .from("message_reactions")
-            .select("*")
-            .eq("conversation_id", cid)
-            .in("message_id", pageIds.slice(offset, offset + 100));
-          if (reactionRows.error) throw reactionRows.error;
-          loadedReactions.push(...(reactionRows.data || []));
+          // A group may have more reactions than the REST row cap; paginate by its unique key.
+          let reactionCursor: MessageReaction | undefined;
+          while (activeRef.current === cid) {
+            let reactionQuery = client
+              .from("message_reactions")
+              .select("*")
+              .eq("conversation_id", cid)
+              .in("message_id", pageIds.slice(offset, offset + 100))
+              .order("message_id", { ascending: true })
+              .order("user_id", { ascending: true })
+              .limit(500);
+            if (reactionCursor)
+              reactionQuery = reactionQuery.or(
+                `message_id.gt.${reactionCursor.message_id},and(message_id.eq.${reactionCursor.message_id},user_id.gt.${reactionCursor.user_id})`,
+              );
+            const reactionRows = await reactionQuery;
+            if (reactionRows.error) throw reactionRows.error;
+            const reactionPage = (reactionRows.data || []) as MessageReaction[];
+            loadedReactions.push(...reactionPage);
+            if (reactionPage.length < 500) break;
+            reactionCursor = reactionPage.at(-1);
+          }
         }
         if (activeRef.current !== cid) return;
         if (older || messages.length === 0)
